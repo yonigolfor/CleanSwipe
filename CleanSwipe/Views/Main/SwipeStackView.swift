@@ -1,0 +1,188 @@
+//
+//  SwipeStackView.swift
+//  CleanSwipe
+//
+//  המסך הראשי עם סטאק הקלפים ומנוע ה-Swipe
+//
+
+import SwiftUI
+
+struct SwipeStackView: View {
+    // Use the shared VM passed from ContentView — fixes the ReviewBin empty bug
+    @EnvironmentObject private var viewModel: PhotoStackViewModel
+    @State private var dragOffset: CGSize = .zero
+    @State private var dragRotation: Double = 0
+    
+    private let cardStackSize = 3 // כמה קלפים מציגים מאחור
+    
+    var body: some View {
+        // Outer ZStack: background | card column | DopamineMeter floating on top.
+        // DopamineMeter MUST be a direct child of this ZStack (not buried inside
+        // the VStack) so that .zIndex(100) has real effect against the cards.
+        ZStack(alignment: .top) {
+            // 1. Background
+            Color(UIColor.systemGroupedBackground)
+                .ignoresSafeArea()
+
+            // 2. Column: spacer gap + cards + instructions
+            VStack(spacing: 0) {
+                // Reserve the same vertical space DopamineMeter will occupy
+                // so the cards don't slide underneath it (≈ 90pt incl. padding).
+                Color.clear.frame(height: 90)
+
+                // Card Stack
+                GeometryReader { geometry in
+                    ZStack {
+                        if viewModel.photoStack.isEmpty {
+                            EmptyStateView.allDone
+                        } else {
+                            ForEach(
+                                Array(viewModel.photoStack.prefix(cardStackSize).enumerated()),
+                                id: \.element.id
+                            ) { index, item in
+                                PhotoCardView(item: item, isTopCard: index == 0)
+                                    .frame(
+                                        width: geometry.size.width - 40,
+                                        height: geometry.size.height - 40
+                                    )
+                                    .zIndex(Double(cardStackSize - index))
+                                    .offset(
+                                        x: index == 0 ? dragOffset.width : 0,
+                                        y: index == 0 ? dragOffset.height : CGFloat(index * 8)
+                                    )
+                                    .scaleEffect(index == 0 ? 1.0 : (1.0 - CGFloat(index) * 0.05))
+                                    .rotationEffect(
+                                        .degrees(index == 0 ? dragRotation + item.rotation : item.rotation)
+                                    )
+                                    .opacity(index == 0 ? 1.0 : (1.0 - Double(index) * 0.2))
+                                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
+                                    .gesture(index == 0 ? dragGesture : nil)
+                                    .overlay {
+                                        if index == 0 { swipeIndicatorOverlay }
+                                    }
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .padding(.vertical, 10)
+
+                // Instructions bar
+                if !viewModel.photoStack.isEmpty {
+                    instructionsView
+                        .padding(.bottom, 20)
+                }
+            }
+
+            // 3. DopamineMeter — floats above everything in this ZStack.
+            //    .zIndex(100) works here because it is a direct ZStack sibling,
+            //    not nested inside the VStack.
+            DopamineMeter(
+                spaceSaved: viewModel.spaceSavedText,
+                itemCount: viewModel.reviewBin.count
+            )
+            .padding(.top, 10)
+            .zIndex(100)
+        }
+//        .onShake {
+//            viewModel.undoLastAction()
+//        }
+        .onAppear {
+            viewModel.refreshPhotos()
+        }
+    }
+    
+    // MARK: - Swipe Gesture
+    
+    private var dragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                dragOffset = value.translation
+                
+                // Calculate rotation based on horizontal drag
+                dragRotation = Double(value.translation.width / 20)
+            }
+            .onEnded { value in
+                let direction = SwipeDirection.from(offset: value.translation)
+                
+                if let action = direction.action {
+                    // Animate card off screen
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        switch direction {
+                        case .left:
+                            dragOffset = CGSize(width: -500, height: value.translation.height)
+                        case .right:
+                            dragOffset = CGSize(width: 500, height: value.translation.height)
+                        case .up:
+                            dragOffset = CGSize(width: value.translation.width, height: -500)
+                        case .none:
+                            break
+                        }
+                    }
+                    
+                    // Perform action after exit-animation completes.
+                    // Crucially we reset dragOffset WITHOUT animation so the
+                    // incoming card never inherits the ±500 offset and slides in.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        viewModel.performAction(action)
+                        // Instant reset — no spring — so next card appears at rest
+                        dragOffset = .zero
+                        dragRotation = 0
+                    }
+                } else {
+                    // Spring back to centre
+                    resetCardPosition()
+                }
+            }
+    }
+    
+    // MARK: - Swipe Indicator Overlay
+    
+    private var swipeIndicatorOverlay: some View {
+        let direction = SwipeDirection.from(offset: dragOffset)
+        
+        return SwipeIndicator(direction: direction, offset: dragOffset)
+    }
+    
+    // MARK: - Instructions View
+    
+    private var instructionsView: some View {
+        HStack(spacing: 30) {
+            instructionItem(icon: "arrow.left", text: "Delete", color: .swipeRed)
+            instructionItem(icon: "arrow.up", text: "Star", color: .swipeYellow)
+            instructionItem(icon: "arrow.right", text: "Keep", color: .swipeGreen)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.cardBackground.opacity(0.9))
+                .shadow(color: .black.opacity(0.05), radius: 5)
+        )
+        .padding(.horizontal)
+    }
+    
+    private func instructionItem(icon: String, text: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(color)
+            Text(text)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func resetCardPosition() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            dragOffset = .zero
+            dragRotation = 0
+        }
+    }
+}
+
+#Preview {
+    SwipeStackView()
+}
