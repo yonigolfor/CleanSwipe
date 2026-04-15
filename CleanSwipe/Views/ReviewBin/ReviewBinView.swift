@@ -13,6 +13,10 @@ struct ReviewBinView: View {
     @EnvironmentObject var stackViewModel: PhotoStackViewModel
     @StateObject private var viewModel = ReviewBinViewModel()
 
+    // Celebration state
+    @State private var celebrationSpace: String? = nil
+    @State private var celebrationCount: Int = 0
+
     private let columns = [
         GridItem(.flexible()),
         GridItem(.flexible()),
@@ -22,27 +26,48 @@ struct ReviewBinView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                if stackViewModel.reviewBin.isEmpty {
-                    EmptyStateView.emptyBin
-                } else {
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 12) {
-                            ForEach(stackViewModel.reviewBin) { item in
-                                ReviewGridItemView(item: item)
-                                    .onTapGesture {
-                                        viewModel.selectItem(item)
-                                    }
-                                    .contextMenu {
-                                        Button {
-                                            stackViewModel.restoreFromBin(item)
-                                        } label: {
-                                            Label("Restore", systemImage: "arrow.uturn.backward")
+                // ── Content ──────────────────────────────────────────────
+                VStack(spacing: 0) {
+                    // Space-saved meter (same as in the Swipe screen)
+                    DopamineMeter(
+                        spaceSaved: stackViewModel.spaceSavedText,
+                        itemCount: stackViewModel.reviewBin.count
+                    )
+                    .padding(.top, 8)
+
+                    if stackViewModel.reviewBin.isEmpty {
+                        EmptyStateView.emptyBin
+                    } else {
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(stackViewModel.reviewBin) { item in
+                                    ReviewGridItemView(item: item)
+                                        .onTapGesture {
+                                            viewModel.selectItem(item)
                                         }
-                                    }
+                                        .contextMenu {
+                                            Button {
+                                                stackViewModel.restoreFromBin(item)
+                                            } label: {
+                                                Label("Restore", systemImage: "arrow.uturn.backward")
+                                            }
+                                        }
+                                }
                             }
+                            .padding()
                         }
-                        .padding()
                     }
+                }
+
+                // ── Celebration overlay ───────────────────────────────────
+                if let spaceSaved = celebrationSpace {
+                    TrashCelebrationView(
+                        spaceSaved: spaceSaved,
+                        itemCount: celebrationCount,
+                        onDismiss: { celebrationSpace = nil }
+                    )
+                    .transition(.opacity)
+                    .zIndex(10)
                 }
             }
             .navigationTitle("Review Bin")
@@ -62,15 +87,21 @@ struct ReviewBinView: View {
             .alert("Empty Trash", isPresented: $viewModel.isShowingDeleteConfirmation) {
                 Button("Cancel", role: .cancel) {}
                 Button("Delete \(stackViewModel.reviewBin.count) Items", role: .destructive) {
+                    // Capture BEFORE emptyTrash zeroes it out
+                    let savedText  = stackViewModel.spaceSavedText
+                    let savedCount = stackViewModel.reviewBin.count
                     Task {
                         try? await stackViewModel.emptyTrash()
+                        // Show celebration with the captured values
+                        withAnimation {
+                            celebrationCount = savedCount
+                            celebrationSpace = savedText
+                        }
                     }
                 }
             } message: {
                 Text("This will permanently delete \(stackViewModel.reviewBin.count) items from your library. This action cannot be undone.")
             }
-            // Use fullScreenCover so swipe-down dismisses fully instead of
-            // leaving a floating mini-card at the bottom of the screen.
             .fullScreenCover(item: $viewModel.selectedItem) { item in
                 FullScreenMediaView(
                     item: item,
@@ -177,7 +208,7 @@ struct FullScreenMediaView: View {
     }
 }
 
-// MARK: - AsyncImage Helper (kept for backward compat)
+// MARK: - AsyncImage Helper
 
 struct AsyncImage: View {
     let asset: PHAsset
