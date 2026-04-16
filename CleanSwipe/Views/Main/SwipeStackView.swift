@@ -84,9 +84,9 @@ struct SwipeStackView: View {
             .padding(.top, 10)
             .zIndex(100)
         }
-//        .onShake {
-//            viewModel.undoLastAction()
-//        }
+        .onShake {
+            viewModel.undoLastAction()
+        }
         .onAppear {
             viewModel.refreshPhotos()
         }
