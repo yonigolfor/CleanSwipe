@@ -39,21 +39,22 @@ class PhotoLibraryService: ObservableObject {
     // MARK: - Fetch Photos
     
     /// טעינת כל התמונות מהגלריה
-    func fetchAllPhotos() {
+    @discardableResult
+    func fetchAllPhotos() -> PHFetchResult<PHAsset> {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         
-        fetchResult = PHAsset.fetchAssets(with: options)
-        
-        guard let fetchResult = fetchResult else { return }
+        let result = PHAsset.fetchAssets(with: options)
+        fetchResult = result
         
         var items: [PhotoItem] = []
-        fetchResult.enumerateObjects { asset, _, _ in
-            items.append(PhotoItem(asset: asset))
-        }
-        
-        self.allPhotos = items
-    }
+                result.enumerateObjects { asset, _, _ in
+                    items.append(PhotoItem(asset: asset))
+                }
+                
+                self.allPhotos = items
+                return result
+            }
     
     /// סינון לפי קטגוריה
     func fetchPhotos(for category: FilterCategory) -> [PhotoItem] {

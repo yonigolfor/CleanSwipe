@@ -34,8 +34,11 @@ struct SwipeStackView: View {
                 // Card Stack
                 GeometryReader { geometry in
                     ZStack {
+                        let _ = print("🔄 ZStack rerender, stack count: \(viewModel.photoStack.count)")
+
                         if viewModel.photoStack.isEmpty {
                             VictoryView(onEmptyBin: { selectedTab = 2 })
+                                .id("victory")
                         } else {
                             ForEach(
                                 Array(viewModel.photoStack.prefix(cardStackSize).enumerated()),

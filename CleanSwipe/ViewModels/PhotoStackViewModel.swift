@@ -10,7 +10,7 @@ import Photos
 import Combine
 
 @MainActor
-class PhotoStackViewModel: ObservableObject {
+class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLibraryChangeObserver {
     // MARK: - Published Properties
 
     @Published var photoStack: [PhotoItem] = []
@@ -59,13 +59,28 @@ class PhotoStackViewModel: ObservableObject {
 
     // MARK: - Initialization
 
-    init() {
+    override init() {
+        super.init()
         persistence.resetIfOld()
         self.processedAssetIDs = persistence.keptPhotoIDs
         loadPhotos()
         restoreBinFromDisk()
+        PHPhotoLibrary.shared().register(self)
     }
 
+    nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
+        Task { @MainActor in
+            self.photoService.fetchAllPhotos() // מרענן את fetchResult
+            let existingIDs = Set(self.photoStack.map { $0.id })
+            let all = self.photoService.fetchPhotos(for: self.currentFilter)
+            let newItems = all.filter {
+                !self.processedAssetIDs.contains($0.id) && !existingIDs.contains($0.id)
+            }
+            guard !newItems.isEmpty else { return }
+            self.photoStack.append(contentsOf: newItems)
+        }
+    }
+    
     private func restoreBinFromDisk() {
         let savedIDs = persistence.reviewBinIDs
         guard !savedIDs.isEmpty else { return }
@@ -90,6 +105,7 @@ class PhotoStackViewModel: ObservableObject {
             // Fetch from library, then strip out anything already acted upon
             let all = photoService.fetchPhotos(for: filter)
             let items = all.filter { !processedAssetIDs.contains($0.id) }
+            print("📸 total fetched: \(all.count), after filter: \(items.count), processedIDs: \(processedAssetIDs.count)")
 
             await MainActor.run {
                 self.photoStack = items
