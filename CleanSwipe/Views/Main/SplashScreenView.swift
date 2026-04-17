@@ -32,21 +32,19 @@ struct SplashScreenView: View {
                     }
                 }
                 .scaleEffect(size)
-                .opacity(opacity)
-                .onAppear {
-                    withAnimation(.easeIn(duration: 1.0)) {
-                        self.size = 1.0
-                        self.opacity = 1.0
-                    }
-                }
+.opacity(opacity)
+
             }
             .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.3) {
-                    withAnimation {
-                        self.isActive = true
-                    }
-                }
-            }
+    withAnimation(.easeIn(duration: 1.0)) {
+        size = 1.0
+        opacity = 1.0
+    }
+    Task {
+        try? await Task.sleep(for: .seconds(1.3))
+        withAnimation { isActive = true }
+    }
+}
         }
     }
 }

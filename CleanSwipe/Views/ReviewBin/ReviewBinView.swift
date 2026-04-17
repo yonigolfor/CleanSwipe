@@ -28,12 +28,16 @@ struct ReviewBinView: View {
             ZStack {
                 // ── Content ──────────────────────────────────────────────
                 VStack(spacing: 0) {
-                    // Space-saved meter (same as in the Swipe screen)
-                    DopamineMeter(
-                        spaceSaved: stackViewModel.spaceSavedText,
-                        itemCount: stackViewModel.reviewBin.count
-                    )
-                    .padding(.top, 8)
+                    if stackViewModel.reviewBin.isEmpty {
+    LifetimeSavingsView(text: stackViewModel.lifetimeSpaceSavedText)
+        .padding(.top, 20)
+} else {
+    DopamineMeter(
+        spaceSaved: stackViewModel.spaceSavedText,
+        itemCount: stackViewModel.reviewBin.count
+    )
+    .padding(.top, 8)
+}
 
                     if stackViewModel.reviewBin.isEmpty {
                         EmptyStateView.emptyBin
@@ -113,6 +117,39 @@ struct ReviewBinView: View {
                 )
             }
         }
+    }
+
+    // MARK: - Lifetime Savings View
+
+    private var lifetimeSavingsView: some View {
+        VStack(spacing: 8) {
+            Text("Total Storage Freed")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.secondary)
+
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundColor(.blue)
+
+                Text(stackViewModel.lifetimeSpaceSavedText)
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundColor(.primary)
+
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundColor(.blue)
+            }
+        }
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(UIColor.secondarySystemGroupedBackground))
+                .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+        )
+        .padding(.horizontal)
     }
 }
 
@@ -204,35 +241,6 @@ struct FullScreenMediaView: View {
             ) { loaded in
                 withAnimation { self.image = loaded; self.isLoading = false }
             }
-        }
-    }
-}
-
-// MARK: - AsyncImage Helper
-
-struct AsyncImage: View {
-    let asset: PHAsset
-    @State private var image: UIImage?
-
-    var body: some View {
-        Group {
-            if let image = image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } else {
-                ProgressView()
-            }
-        }
-        .onAppear { loadFullImage() }
-    }
-
-    private func loadFullImage() {
-        PhotoLibraryService.shared.loadImage(
-            for: asset,
-            targetSize: PHImageManagerMaximumSize
-        ) { loadedImage in
-            withAnimation { self.image = loadedImage }
         }
     }
 }

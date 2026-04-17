@@ -179,4 +179,12 @@ class PhotoLibraryService: ObservableObject {
         
         return count
     }
+    func fetchAllAssetsMap() -> [String: PHAsset] {
+        let result = PHAsset.fetchAssets(with: nil)
+        var map: [String: PHAsset] = [:]
+        result.enumerateObjects { asset, _, _ in
+            map[asset.localIdentifier] = asset
+        }
+        return map
+    }
 }

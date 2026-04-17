@@ -27,11 +27,13 @@ class PhotoStackViewModel: ObservableObject {
     /// (their IDs can never come back anyway), or when the user explicitly
     /// undoes an action via restoreFromBin.
     private var processedAssetIDs: Set<String> = []
+    private var lastAction: (item: PhotoItem, action: SwipeAction)?
 
     // MARK: - Services
 
     private let photoService = PhotoLibraryService.shared
     private let hapticService = HapticService.shared
+    private let persistence = PersistenceService.shared
 
     // MARK: - Computed Properties
 
@@ -39,7 +41,15 @@ class PhotoStackViewModel: ObservableObject {
     var remainingCount: Int { photoStack.count }
 
     var spaceSavedText: String {
-        let megabytes = Double(totalSpaceSaved) / 1_048_576
+        formatBytes(totalSpaceSaved)
+    }
+
+    var lifetimeSpaceSavedText: String {
+        formatBytes(persistence.totalSpaceSavedLifetime)
+    }
+
+    private func formatBytes(_ bytes: Int64) -> String {
+        let megabytes = Double(bytes) / 1_048_576
         if megabytes < 1024 {
             return String(format: "%.1f MB", megabytes)
         } else {
@@ -50,7 +60,23 @@ class PhotoStackViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
+        persistence.resetIfOld()
+        self.processedAssetIDs = persistence.keptPhotoIDs
         loadPhotos()
+        restoreBinFromDisk()
+    }
+
+    private func restoreBinFromDisk() {
+        let savedIDs = persistence.reviewBinIDs
+        guard !savedIDs.isEmpty else { return }
+        let all = photoService.fetchAllAssetsMap()
+        let items = savedIDs.compactMap { id -> PhotoItem? in
+            guard let asset = all[id] else { return nil }
+            return PhotoItem(asset: asset)
+        }
+        self.reviewBin = items
+        self.totalSpaceSaved = persistence.reviewBinSpaceSaved
+        items.forEach { processedAssetIDs.insert($0.id) }
     }
 
     // MARK: - Data Loading
@@ -92,6 +118,8 @@ class PhotoStackViewModel: ObservableObject {
     func keepPhoto() {
         guard let topCard = photoStack.first else { return }
         processedAssetIDs.insert(topCard.id)
+        persistence.saveKeptID(topCard.id)
+        self.lastAction = (topCard, .keep)
         photoStack.removeFirst()
         hapticService.keep()
         precacheNextImages()
@@ -101,17 +129,20 @@ class PhotoStackViewModel: ObservableObject {
     func deletePhoto() {
         guard let topCard = photoStack.first else { return }
         processedAssetIDs.insert(topCard.id)
+        self.lastAction = (topCard, .delete)
         photoStack.removeFirst()
         reviewBin.append(topCard)
         totalSpaceSaved += topCard.fileSize
         hapticService.delete()
         precacheNextImages()
+        saveBinToDisk()
     }
 
     /// Swipe Up — Star Keeper
     func starPhoto() {
         guard var topCard = photoStack.first else { return }
         processedAssetIDs.insert(topCard.id)
+        self.lastAction = (topCard, .starKeeper)
         photoStack.removeFirst()
         topCard.isStarred = true
         hapticService.starKeeper()
@@ -120,12 +151,20 @@ class PhotoStackViewModel: ObservableObject {
 
     /// Undo — restores the last deleted photo back to the top of the stack
     func undoLastAction() {
-        guard let lastDeleted = reviewBin.last else { return }
-        reviewBin.removeLast()
-        // Un-process it so it can be swiped again
-        processedAssetIDs.remove(lastDeleted.id)
-        photoStack.insert(lastDeleted, at: 0)
-        totalSpaceSaved -= lastDeleted.fileSize
+        guard let last = lastAction else { return }
+        lastAction = nil
+        let item = last.item
+
+        processedAssetIDs.remove(item.id)
+        persistence.removeKeptID(item.id)
+        photoStack.insert(item, at: 0)
+
+        if last.action == .delete {
+            reviewBin.removeAll { $0.id == item.id }
+            totalSpaceSaved -= item.fileSize
+            saveBinToDisk()
+        }
+
         hapticService.undo()
     }
 
@@ -137,21 +176,36 @@ class PhotoStackViewModel: ObservableObject {
         reviewBin.remove(at: index)
         // Un-process so the item can be swiped again
         processedAssetIDs.remove(item.id)
+        // Ensure it's not in persistent kept IDs either (though it shouldn't be if it was in the bin)
+        persistence.removeKeptID(item.id)
         totalSpaceSaved -= item.fileSize
         hapticService.selection()
+        saveBinToDisk()
     }
 
     /// Permanently delete everything in the Review Bin
     func emptyTrash() async throws {
         let assetsToDelete = reviewBin.map { $0.asset }
+        let currentSaved = totalSpaceSaved
+        
         hapticService.emptyTrash()
         try await photoService.deleteAssets(assetsToDelete)
+        
         // Permanently-deleted IDs stay in processedAssetIDs — they can never
         // come back from the library anyway.
         await MainActor.run {
+            persistence.totalSpaceSavedLifetime += currentSaved
             reviewBin.removeAll()
             totalSpaceSaved = 0
+            saveBinToDisk()
         }
+    }
+    
+    /// Resets all "Kept" decisions to start over
+    func resetProgress() {
+        persistence.keptPhotoIDs = []
+        processedAssetIDs = []
+        loadPhotos(filter: currentFilter)
     }
 
     // MARK: - Dispatch Helper
@@ -167,6 +221,10 @@ class PhotoStackViewModel: ObservableObject {
 
     // MARK: - Private Helpers
 
+    private func saveBinToDisk() {
+        persistence.reviewBinIDs = reviewBin.map { $0.id }
+        persistence.reviewBinSpaceSaved = totalSpaceSaved
+    }
     private func precacheNextImages() {
         let nextItems = Array(photoStack.prefix(5))
         guard !nextItems.isEmpty else { return }

@@ -34,7 +34,7 @@ struct ContentView: View {
     private var mainTabView: some View {
         TabView(selection: $selectedTab) {
             // Swipe Stack (Main)
-            SwipeStackView()
+            SwipeStackView(selectedTab: $selectedTab)
                 .environmentObject(stackViewModel)
                 .tabItem {
                     Label("Swipe", systemImage: "rectangle.stack")

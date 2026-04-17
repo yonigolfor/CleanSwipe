@@ -10,6 +10,7 @@ import SwiftUI
 struct SwipeStackView: View {
     // Use the shared VM passed from ContentView — fixes the ReviewBin empty bug
     @EnvironmentObject private var viewModel: PhotoStackViewModel
+    @Binding var selectedTab: Int
     @State private var dragOffset: CGSize = .zero
     @State private var dragRotation: Double = 0
     
@@ -34,7 +35,7 @@ struct SwipeStackView: View {
                 GeometryReader { geometry in
                     ZStack {
                         if viewModel.photoStack.isEmpty {
-                            EmptyStateView.allDone
+                            VictoryView(onEmptyBin: { selectedTab = 2 })
                         } else {
                             ForEach(
                                 Array(viewModel.photoStack.prefix(cardStackSize).enumerated()),
@@ -184,5 +185,6 @@ struct SwipeStackView: View {
 }
 
 #Preview {
-    SwipeStackView()
+    SwipeStackView(selectedTab: .constant(0))
+        .environmentObject(PhotoStackViewModel())
 }
