@@ -105,7 +105,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
             // Fetch from library, then strip out anything already acted upon
             let all = photoService.fetchPhotos(for: filter)
             let items = all.filter { !processedAssetIDs.contains($0.id) }
-            print("📸 total fetched: \(all.count), after filter: \(items.count), processedIDs: \(processedAssetIDs.count)")
+//            print("📸 total fetched: \(all.count), after filter: \(items.count), processedIDs: \(processedAssetIDs.count)")
 
             await MainActor.run {
                 self.photoStack = items
@@ -117,6 +117,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
                         targetSize: CGSize(width: 400, height: 600)
                     )
                 }
+                self.syncWidget()
             }
         }
     }
@@ -126,6 +127,25 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     func refreshPhotos() {
         photoService.fetchAllPhotos()
         loadPhotos(filter: currentFilter)
+    }
+    
+    private func applyPendingWidgetAction() {
+        guard let pending = WidgetSyncService.shared.pendingWidgetAction() else { return }
+        WidgetSyncService.shared.clearPendingAction()
+        guard let item = photoStack.first(where: { $0.id == pending.id }) else { return }
+        switch pending.action {
+        case .keep:
+            processedAssetIDs.insert(item.id)
+            persistence.saveKeptID(item.id)
+            photoStack.removeAll { $0.id == item.id }
+        case .delete:
+            processedAssetIDs.insert(item.id)
+            photoStack.removeAll { $0.id == item.id }
+            reviewBin.append(item)
+            totalSpaceSaved += item.fileSize
+            saveBinToDisk()
+        }
+        syncWidget()
     }
 
     // MARK: - Swipe Actions
@@ -139,6 +159,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         photoStack.removeFirst()
         hapticService.keep()
         precacheNextImages()
+        syncWidget()
     }
 
     /// Swipe Left — Delete (moves to Review Bin)
@@ -152,6 +173,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         hapticService.delete()
         precacheNextImages()
         saveBinToDisk()
+        syncWidget()
     }
 
     /// Swipe Up — Star Keeper
@@ -237,6 +259,13 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
 
     // MARK: - Private Helpers
 
+    private func syncWidget() {
+        WidgetSyncService.shared.syncProcessedIDs(processedAssetIDs)
+        if let next = photoStack.first {
+            WidgetSyncService.shared.pushNextAsset(next)
+        }
+    }
+    
     private func saveBinToDisk() {
         persistence.reviewBinIDs = reviewBin.map { $0.id }
         persistence.reviewBinSpaceSaved = totalSpaceSaved

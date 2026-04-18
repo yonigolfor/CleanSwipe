@@ -6,6 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5371DA792F92C14700CF3519 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5371DA782F92C14700CF3519 /* WidgetKit.framework */; };
+		5371DA7B2F92C14700CF3519 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5371DA7A2F92C14700CF3519 /* SwiftUI.framework */; };
+		5371DA8C2F92C14800CF3519 /* SwipeWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5371DA762F92C14700CF3519 /* SwipeWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5371DA9C2F92C4B500CF3519 /* SharedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5371DA982F92C30100CF3519 /* SharedModels.swift */; };
+		5371DA9D2F92C4B500CF3519 /* SharedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5371DA982F92C30100CF3519 /* SharedModels.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		531E76A32F8EF250003C31D3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -21,13 +29,49 @@
 			remoteGlobalIDString = 531E76912F8EF24F003C31D3;
 			remoteInfo = CleanSwipe;
 		};
+		5371DA8A2F92C14800CF3519 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 531E768A2F8EF24F003C31D3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5371DA752F92C14700CF3519;
+			remoteInfo = SwipeWidgetExtension;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5371DA912F92C14800CF3519 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				5371DA8C2F92C14800CF3519 /* SwipeWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		531E76922F8EF24F003C31D3 /* CleanSwipe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CleanSwipe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		531E76A22F8EF250003C31D3 /* CleanSwipeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CleanSwipeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		531E76AC2F8EF250003C31D3 /* CleanSwipeUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CleanSwipeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5371DA762F92C14700CF3519 /* SwipeWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SwipeWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5371DA782F92C14700CF3519 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		5371DA7A2F92C14700CF3519 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		5371DA922F92C1F700CF3519 /* SwipeWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SwipeWidgetExtension.entitlements; sourceTree = "<group>"; };
+		5371DA982F92C30100CF3519 /* SharedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5371DA8D2F92C14800CF3519 /* Exceptions for "SwipeWidget" folder in "SwipeWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5371DA752F92C14700CF3519 /* SwipeWidgetExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		531E76942F8EF24F003C31D3 /* CleanSwipe */ = {
@@ -43,6 +87,14 @@
 		531E76AF2F8EF250003C31D3 /* CleanSwipeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = CleanSwipeUITests;
+			sourceTree = "<group>";
+		};
+		5371DA7C2F92C14700CF3519 /* SwipeWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5371DA8D2F92C14800CF3519 /* Exceptions for "SwipeWidget" folder in "SwipeWidgetExtension" target */,
+			);
+			path = SwipeWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -69,15 +121,28 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5371DA732F92C14700CF3519 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5371DA7B2F92C14700CF3519 /* SwiftUI.framework in Frameworks */,
+				5371DA792F92C14700CF3519 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		531E76892F8EF24F003C31D3 = {
 			isa = PBXGroup;
 			children = (
+				5371DA972F92C2C100CF3519 /* Shared */,
+				5371DA922F92C1F700CF3519 /* SwipeWidgetExtension.entitlements */,
 				531E76942F8EF24F003C31D3 /* CleanSwipe */,
 				531E76A52F8EF250003C31D3 /* CleanSwipeTests */,
 				531E76AF2F8EF250003C31D3 /* CleanSwipeUITests */,
+				5371DA7C2F92C14700CF3519 /* SwipeWidget */,
+				5371DA772F92C14700CF3519 /* Frameworks */,
 				531E76932F8EF24F003C31D3 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,8 +153,26 @@
 				531E76922F8EF24F003C31D3 /* CleanSwipe.app */,
 				531E76A22F8EF250003C31D3 /* CleanSwipeTests.xctest */,
 				531E76AC2F8EF250003C31D3 /* CleanSwipeUITests.xctest */,
+				5371DA762F92C14700CF3519 /* SwipeWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		5371DA772F92C14700CF3519 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				5371DA782F92C14700CF3519 /* WidgetKit.framework */,
+				5371DA7A2F92C14700CF3519 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		5371DA972F92C2C100CF3519 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				5371DA982F92C30100CF3519 /* SharedModels.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -102,10 +185,12 @@
 				531E768E2F8EF24F003C31D3 /* Sources */,
 				531E768F2F8EF24F003C31D3 /* Frameworks */,
 				531E76902F8EF24F003C31D3 /* Resources */,
+				5371DA912F92C14800CF3519 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				5371DA8B2F92C14800CF3519 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				531E76942F8EF24F003C31D3 /* CleanSwipe */,
@@ -163,6 +248,28 @@
 			productReference = 531E76AC2F8EF250003C31D3 /* CleanSwipeUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		5371DA752F92C14700CF3519 /* SwipeWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5371DA8E2F92C14800CF3519 /* Build configuration list for PBXNativeTarget "SwipeWidgetExtension" */;
+			buildPhases = (
+				5371DA722F92C14700CF3519 /* Sources */,
+				5371DA732F92C14700CF3519 /* Frameworks */,
+				5371DA742F92C14700CF3519 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				5371DA7C2F92C14700CF3519 /* SwipeWidget */,
+			);
+			name = SwipeWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = SwipeWidgetExtension;
+			productReference = 5371DA762F92C14700CF3519 /* SwipeWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -184,6 +291,9 @@
 						CreatedOnToolsVersion = 16.2;
 						TestTargetID = 531E76912F8EF24F003C31D3;
 					};
+					5371DA752F92C14700CF3519 = {
+						CreatedOnToolsVersion = 16.2;
+					};
 				};
 			};
 			buildConfigurationList = 531E768D2F8EF24F003C31D3 /* Build configuration list for PBXProject "CleanSwipe" */;
@@ -203,6 +313,7 @@
 				531E76912F8EF24F003C31D3 /* CleanSwipe */,
 				531E76A12F8EF250003C31D3 /* CleanSwipeTests */,
 				531E76AB2F8EF250003C31D3 /* CleanSwipeUITests */,
+				5371DA752F92C14700CF3519 /* SwipeWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -229,6 +340,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5371DA742F92C14700CF3519 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -236,6 +354,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5371DA9C2F92C4B500CF3519 /* SharedModels.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -253,6 +372,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5371DA722F92C14700CF3519 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5371DA9D2F92C4B500CF3519 /* SharedModels.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -265,6 +392,11 @@
 			isa = PBXTargetDependency;
 			target = 531E76912F8EF24F003C31D3 /* CleanSwipe */;
 			targetProxy = 531E76AD2F8EF250003C31D3 /* PBXContainerItemProxy */;
+		};
+		5371DA8B2F92C14800CF3519 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 5371DA752F92C14700CF3519 /* SwipeWidgetExtension */;
+			targetProxy = 5371DA8A2F92C14800CF3519 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -393,6 +525,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CleanSwipe/CleanSwipe.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"CleanSwipe/Preview Content\"";
@@ -423,6 +556,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CleanSwipe/CleanSwipe.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"CleanSwipe/Preview Content\"";
@@ -520,6 +654,62 @@
 			};
 			name = Release;
 		};
+		5371DA8F2F92C14800CF3519 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SwipeWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6Q59R4QBXF;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SwipeWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SwipeWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "-.CleanSwipe.SwipeWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		5371DA902F92C14800CF3519 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = SwipeWidgetExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6Q59R4QBXF;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SwipeWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = SwipeWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "-.CleanSwipe.SwipeWidget";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -555,6 +745,15 @@
 			buildConfigurations = (
 				531E76BD2F8EF250003C31D3 /* Debug */,
 				531E76BE2F8EF250003C31D3 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5371DA8E2F92C14800CF3519 /* Build configuration list for PBXNativeTarget "SwipeWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5371DA8F2F92C14800CF3519 /* Debug */,
+				5371DA902F92C14800CF3519 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
