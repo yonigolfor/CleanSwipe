@@ -20,6 +20,8 @@ struct PhotoCardView: View {
     @State private var image: UIImage?
     @State private var isLoading = true
     @State private var player: AVPlayer?
+    @State private var isMuted = false
+
 
     var body: some View {
         ZStack {
@@ -43,8 +45,27 @@ struct PhotoCardView: View {
                             }
 
                             VideoPlayerView(player: player, gravity: isPortrait ? .resizeAspectFill : .resizeAspect)
-                                .frame(width: geo.size.width, height: geo.size.height)
-                                .clipped()
+    .frame(width: geo.size.width, height: geo.size.height)
+    .clipped()
+    .onTapGesture {
+        isMuted.toggle()
+        player.isMuted = isMuted
+    }
+
+if isMuted {
+    VStack {
+        HStack {
+            Image(systemName: "speaker.slash.fill")
+                .font(.caption)
+                .foregroundColor(.white)
+                .padding(6)
+                .background(Circle().fill(.black.opacity(0.6)))
+                .padding(8)
+            Spacer()
+        }
+        Spacer()
+    }
+}
                         }
                     }
                 } else if isLoading {
