@@ -104,7 +104,12 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         Task {
             // Fetch from library, then strip out anything already acted upon
             let all = photoService.fetchPhotos(for: filter)
-            let items = all.filter { !processedAssetIDs.contains($0.id) }
+            var items = all.filter { !processedAssetIDs.contains($0.id) }
+            if filter == .burstPhotos {
+                items = await BurstAnalyzer.shared.analyze(items)
+            } else if filter == .blurryPhotos {
+                items = await filterBlurry(items)
+            }
             print("📸 total fetched: \(all.count), after filter: \(items.count), processedIDs: \(processedAssetIDs.count)")
 
             await MainActor.run {
@@ -163,6 +168,12 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         topCard.isStarred = true
         hapticService.starKeeper()
         precacheNextImages()
+        Task {
+            try? await PHPhotoLibrary.shared().performChanges {
+                    let request = PHAssetChangeRequest(for: topCard.asset)
+                    request.isFavorite = true
+                }
+            }
     }
 
     /// Undo — restores the last deleted photo back to the top of the stack
@@ -236,6 +247,37 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     }
 
     // MARK: - Private Helpers
+
+    private func filterBlurry(_ items: [PhotoItem]) async -> [PhotoItem] {
+        await withCheckedContinuation { continuation in
+            Task.detached(priority: .userInitiated) {
+                var result: [PhotoItem] = []
+                let group = DispatchGroup()
+                let lock = NSLock()
+
+                for item in items {
+                    guard !item.isVideo else { continue }
+                    group.enter()
+                    PhotoLibraryService.shared.loadImage(
+                        for: item.asset,
+                        targetSize: CGSize(width: 200, height: 200)
+                    ) { image in
+                        defer { group.leave() }
+                        guard let image else { return }
+                        if BlurDetector.shared.isBlurry(image) {
+                            lock.lock()
+                            result.append(item)
+                            lock.unlock()
+                        }
+                    }
+                }
+
+                group.notify(queue: .main) {
+                    continuation.resume(returning: result)
+                }
+            }
+        }
+    }
 
     private func saveBinToDisk() {
         persistence.reviewBinIDs = reviewBin.map { $0.id }

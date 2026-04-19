@@ -72,10 +72,10 @@ struct SwipeStackView: View {
                 .padding(.vertical, 10)
 
                 // Instructions bar
-                if !viewModel.photoStack.isEmpty {
-                    instructionsView
-                        .padding(.bottom, 20)
-                }
+//                if !viewModel.photoStack.isEmpty {
+//                    instructionsView
+//                        .padding(.bottom, 20)
+//                }
             }
 
             // 3. DopamineMeter — floats above everything in this ZStack.
@@ -91,6 +91,7 @@ struct SwipeStackView: View {
         .onShake {
             viewModel.undoLastAction()
         }
+        .toolbarBackground(.visible, for: .tabBar)
         .onAppear {
             viewModel.refreshPhotos()
         }

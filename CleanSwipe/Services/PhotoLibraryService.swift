@@ -84,12 +84,11 @@ class PhotoLibraryService: ObservableObject {
                     items.append(item)
                 }
                 
+            case .burstPhotos:
+                items.append(item) // נחזיר הכל, ה-BurstAnalyzer יקבץ לפי timestamp
+                
             case .blurryPhotos:
-                // TODO: יש להוסיף בדיקת blur עם Vision Framework
-                // כרגע נחזיר תמונות רגילות
-                if !item.isVideo && !item.isScreenshot {
-                    items.append(item)
-                }
+                break // מטופל ב-PhotoStackViewModel
             }
         }
         
@@ -173,8 +172,11 @@ class PhotoLibraryService: ObservableObject {
             case .largeVideos:
                 if item.isVideo && item.fileSize > 50_000_000 { count += 1 }
                 
+            case .burstPhotos:
+                count += 1
+                
             case .blurryPhotos:
-                if !item.isVideo && !item.isScreenshot { count += 1 }
+                if !item.isVideo && !item.isScreenshot { count += 1 } // approximation
             }
         }
         

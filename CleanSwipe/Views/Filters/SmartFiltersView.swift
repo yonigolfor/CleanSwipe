@@ -95,12 +95,14 @@ struct SmartFiltersView: View {
     // MARK: - Data Loading
     
     private func loadCounts() {
-        let service = PhotoLibraryService.shared
-        
-        // Load counts for each category
-        for category in FilterCategory.allCases {
-            let count = service.count(for: category)
-            categoryCounts[category] = count
+        Task.detached(priority: .userInitiated) {
+            let service = PhotoLibraryService.shared
+            let counts: [FilterCategory: Int] = Dictionary(
+                uniqueKeysWithValues: FilterCategory.allCases.map { ($0, service.count(for: $0)) }
+            )
+            await MainActor.run {
+                categoryCounts = counts
+            }
         }
     }
 }
