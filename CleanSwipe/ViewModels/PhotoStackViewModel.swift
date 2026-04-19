@@ -26,7 +26,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     /// Cleared only when emptyTrash() is called for permanently-deleted items
     /// (their IDs can never come back anyway), or when the user explicitly
     /// undoes an action via restoreFromBin.
-    private var processedAssetIDs: Set<String> = []
+    private(set) var processedAssetIDs: Set<String> = []
     private var lastAction: (item: PhotoItem, action: SwipeAction)?
 
     // MARK: - Services
@@ -131,6 +131,10 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     func refreshPhotos() {
         photoService.fetchAllPhotos()
         loadPhotos(filter: currentFilter)
+    }
+
+    func count(for category: FilterCategory) -> Int {
+        photoService.count(for: category, excluding: processedAssetIDs)
     }
 
     // MARK: - Swipe Actions

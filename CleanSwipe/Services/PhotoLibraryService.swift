@@ -151,12 +151,13 @@ class PhotoLibraryService: ObservableObject {
     }
     
     /// ספירת פריטים לפי קטגוריה
-    func count(for category: FilterCategory) -> Int {
+    func count(for category: FilterCategory, excluding processedIDs: Set<String> = []) -> Int {
         guard let fetchResult = fetchResult else { return 0 }
         
         var count = 0
         
         fetchResult.enumerateObjects { asset, _, stop in
+            guard !processedIDs.contains(asset.localIdentifier) else { return }
             let item = PhotoItem(asset: asset)
             
             switch category {

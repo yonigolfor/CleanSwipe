@@ -97,8 +97,9 @@ struct SmartFiltersView: View {
     private func loadCounts() {
         Task.detached(priority: .userInitiated) {
             let service = PhotoLibraryService.shared
+            let processed = await MainActor.run { stackViewModel.processedAssetIDs }
             let counts: [FilterCategory: Int] = Dictionary(
-                uniqueKeysWithValues: FilterCategory.allCases.map { ($0, service.count(for: $0)) }
+                uniqueKeysWithValues: FilterCategory.allCases.map { ($0, service.count(for: $0, excluding: processed)) }
             )
             await MainActor.run {
                 categoryCounts = counts
