@@ -56,7 +56,7 @@ struct SwipeStackView: View {
                                     )
                                     .scaleEffect(index == 0 ? 1.0 : (1.0 - CGFloat(index) * 0.05))
                                     .rotationEffect(
-                                        .degrees(index == 0 ? dragRotation + item.rotation : item.rotation)
+                                        .degrees(index == 0 ? dragRotation : item.rotation)
                                     )
                                     .opacity(index == 0 ? 1.0 : (1.0 - Double(index) * 0.2))
                                     .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
@@ -95,6 +95,9 @@ struct SwipeStackView: View {
         .onAppear {
             viewModel.refreshPhotos()
         }
+        .onDisappear {
+            NotificationCenter.default.post(name: .stopCurrentVideo, object: nil)
+        }
     }
     
     // MARK: - Swipe Gesture
@@ -128,9 +131,9 @@ struct SwipeStackView: View {
                     // Perform action after exit-animation completes.
                     // Crucially we reset dragOffset WITHOUT animation so the
                     // incoming card never inherits the ±500 offset and slides in.
+                    NotificationCenter.default.post(name: .stopCurrentVideo, object: nil)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         viewModel.performAction(action)
-                        // Instant reset — no spring — so next card appears at rest
                         dragOffset = .zero
                         dragRotation = 0
                     }

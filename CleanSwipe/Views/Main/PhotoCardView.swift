@@ -9,6 +9,10 @@ import SwiftUI
 import Photos
 import AVKit
 
+extension Notification.Name {
+    static let stopCurrentVideo = Notification.Name("stopCurrentVideo")
+}
+
 struct PhotoCardView: View {
     let item: PhotoItem
     let isTopCard: Bool
@@ -64,11 +68,28 @@ struct PhotoCardView: View {
             } else {
                 // ── IMAGE ──────────────────────────────────────────────
                 if let image = image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
+                    let isPortrait = item.asset.pixelHeight >= item.asset.pixelWidth
+                    GeometryReader { geo in
+                        ZStack {
+                            if !isPortrait {
+                                // Blurred background — only for landscape
+                                Image(uiImage: image)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fill)
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                    .blur(radius: 25)
+                                    .scaleEffect(1.1)
+                                    .clipped()
+                            }
+
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: isPortrait ? .fill : .fit)
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .clipped()
+                        }
+                    }
+
                 } else if isLoading {
                     ProgressView()
                         .scaleEffect(1.5)
@@ -129,17 +150,24 @@ struct PhotoCardView: View {
             }
         }
         .onDisappear {
-            player?.pause()
+            stopPlayer()
         }
         .onChange(of: isTopCard) { _, nowTop in
-            // Play only when this card is on top, pause when it sinks behind
             if nowTop {
                 player?.seek(to: .zero)
                 player?.play()
             } else {
-                player?.pause()
+                stopPlayer()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .stopCurrentVideo)) { _ in
+            stopPlayer()
+        }
+    }
+
+    // MARK: - Stop Player
+    private func stopPlayer() {
+        player?.pause()
     }
 
     // MARK: - Fallback thumbnail for video
@@ -180,7 +208,8 @@ struct PhotoCardView: View {
                     forName: .AVPlayerItemDidPlayToEndTime,
                     object: playerItem,
                     queue: .main
-                ) { _ in
+                ) { [weak avPlayer] _ in
+                    guard let avPlayer, avPlayer.currentItem != nil else { return }
                     avPlayer.seek(to: .zero)
                     avPlayer.play()
                 }
@@ -223,13 +252,14 @@ class PlayerUIView: UIView {
     init(player: AVPlayer) {
         super.init(frame: .zero)
         playerLayer.player = player
-        playerLayer.videoGravity = .resizeAspectFill
+        playerLayer.videoGravity = .resizeAspect
     }
 
     required init?(coder: NSCoder) { fatalError() }
 }
 
-#Preview {
-    Text("Photo Card Preview")
-        .frame(width: 300, height: 500)
-}
+//#Preview {
+//    Text("Photo Card Preview")
+//        .frame(width: 300, height: 500)
+//    PhotoCardView(item: PhotoItem(asset: PHAsset()), isTopCard: true)
+//}
