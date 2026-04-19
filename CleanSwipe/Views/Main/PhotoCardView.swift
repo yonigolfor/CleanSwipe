@@ -30,9 +30,23 @@ struct PhotoCardView: View {
             if item.isVideo {
                 // ── VIDEO ──────────────────────────────────────────────
                 if let player = player {
-                    VideoPlayerView(player: player)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .clipped()
+                    let isPortrait = item.asset.pixelHeight >= item.asset.pixelWidth
+                    GeometryReader { geo in
+                        ZStack {
+                            if !isPortrait {
+                                // Blurred background — only for landscape
+                                VideoPlayerView(player: player, gravity: .resizeAspectFill)
+                                    .frame(width: geo.size.width, height: geo.size.height)
+                                    .blur(radius: 25)
+                                    .scaleEffect(1.1)
+                                    .clipped()
+                            }
+
+                            VideoPlayerView(player: player, gravity: isPortrait ? .resizeAspectFill : .resizeAspect)
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .clipped()
+                        }
+                    }
                 } else if isLoading {
                     ProgressView()
                         .scaleEffect(1.5)
@@ -228,9 +242,10 @@ struct PhotoCardView: View {
 
 struct VideoPlayerView: UIViewRepresentable {
     let player: AVPlayer
+    var gravity: AVLayerVideoGravity = .resizeAspect
 
     func makeUIView(context: Context) -> PlayerUIView {
-        PlayerUIView(player: player)
+        PlayerUIView(player: player, gravity: gravity)
     }
 
     func updateUIView(_ uiView: PlayerUIView, context: Context) {
@@ -249,10 +264,10 @@ class PlayerUIView: UIView {
 
     override class var layerClass: AnyClass { AVPlayerLayer.self }
 
-    init(player: AVPlayer) {
+    init(player: AVPlayer, gravity: AVLayerVideoGravity = .resizeAspect) {
         super.init(frame: .zero)
         playerLayer.player = player
-        playerLayer.videoGravity = .resizeAspect
+        playerLayer.videoGravity = gravity
     }
 
     required init?(coder: NSCoder) { fatalError() }
