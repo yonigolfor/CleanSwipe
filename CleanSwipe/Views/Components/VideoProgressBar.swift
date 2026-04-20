@@ -12,11 +12,11 @@ struct VideoProgressBar: View {
 
     @State private var progress: Double = 0
     @State private var isDragging = false
-    @State private var timer: Timer?
+    @State private var timeObserver: Any?
+    private let haptic = UISelectionFeedbackGenerator()
 
     var body: some View {
         VStack(spacing: 4) {
-            // Scrubber
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     // Track
@@ -38,13 +38,14 @@ struct VideoProgressBar: View {
                 }
                 .animation(.easeInOut(duration: 0.15), value: isDragging)
                 .contentShape(Rectangle())
-                .gesture(
+                .highPriorityGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
                             isDragging = true
-                            timer?.invalidate()
+                            removeObserver()
                             let newProgress = min(max(value.location.x / geo.size.width, 0), 1)
                             progress = newProgress
+                            haptic.selectionChanged()
                             let seekTime = CMTime(
                                 seconds: newProgress * duration,
                                 preferredTimescale: 600
@@ -53,13 +54,12 @@ struct VideoProgressBar: View {
                         }
                         .onEnded { _ in
                             isDragging = false
-                            startTimer()
+                            startObserver()
                         }
                 )
             }
-            .frame(height: 20)
+            .frame(height: 36)
 
-            // Time labels
             HStack {
                 Text(formatTime(progress * duration))
                     .font(.system(size: 10, weight: .medium))
@@ -70,22 +70,35 @@ struct VideoProgressBar: View {
                     .foregroundColor(.white.opacity(0.8))
             }
         }
-        .onAppear { startTimer() }
-        .onDisappear { timer?.invalidate() }
+        .onAppear {
+            haptic.prepare()
+            startObserver()
+        }
+        .onDisappear {
+            removeObserver()
+        }
     }
 
-    private func startTimer() {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-            guard !isDragging else { return }
-            let current = player.currentTime().seconds
-            guard duration > 0, !current.isNaN else { return }
+    private func startObserver() {
+        removeObserver()
+        let interval = CMTime(seconds: 1.0 / 60.0, preferredTimescale: 600)
+        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            guard !isDragging, duration > 0 else { return }
+            let current = time.seconds
+            guard !current.isNaN else { return }
             progress = min(max(current / duration, 0), 1)
         }
     }
 
+    private func removeObserver() {
+        if let observer = timeObserver {
+            player.removeTimeObserver(observer)
+            timeObserver = nil
+        }
+    }
+
     private func formatTime(_ seconds: Double) -> String {
-        guard !seconds.isNaN else { return "0:00" }
+        guard !seconds.isNaN, seconds >= 0 else { return "0:00" }
         let s = Int(seconds)
         return String(format: "%d:%02d", s / 60, s % 60)
     }
