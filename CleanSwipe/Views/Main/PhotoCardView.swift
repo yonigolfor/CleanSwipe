@@ -21,8 +21,7 @@ struct PhotoCardView: View {
     @State private var image: UIImage?
     @State private var isLoading = true
     @State private var player: AVPlayer?
-    @State private var isMuted = PhotoCardView.globalMute
-
+    @State private var isMuted = false
 
     var body: some View {
         ZStack {
@@ -54,10 +53,10 @@ PhotoCardView.globalMute = isMuted
 player.isMuted = isMuted
     }
 
-if isMuted {
+if item.isVideo {
     VStack {
         HStack {
-            Image(systemName: "speaker.slash.fill")
+            Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
                 .font(.caption)
                 .foregroundColor(.white)
                 .padding(6)
@@ -137,21 +136,31 @@ if isMuted {
                 }
             }
 
-            // ── File size badge (top-right) ────────────────────────────
-            VStack {
-                HStack {
-                    Spacer()
-                    Text(item.fileSizeString)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color.black.opacity(0.6)))
-                        .padding()
-                }
-                Spacer()
+            // ── File size + Favorite badge (top-right) ─────────────────
+VStack {
+    HStack {
+        Spacer()
+        HStack(spacing: 6) {
+            if item.asset.isFavorite {
+                Image(systemName: "heart.fill")
+                    .font(.caption)
+                    .foregroundColor(.pink)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.black.opacity(0.6)))
             }
+            Text(item.fileSizeString)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.black.opacity(0.6)))
+        }
+        .padding()
+    }
+    Spacer()
+}
 
             // ── Screenshot / Recording badge (top-left) ────────────────
             if item.isScreenshot || item.isScreenRecording {
@@ -180,12 +189,13 @@ if isMuted {
         .clipShape(RoundedRectangle(cornerRadius: 20))
         .cardShadow()
         .onAppear {
-            if item.isVideo {
-                loadVideoPlayer()
-            } else {
-                loadImage()
-            }
-        }
+    if item.isVideo {
+        isMuted = PhotoCardView.globalMute
+        loadVideoPlayer()
+    } else {
+        loadImage()
+    }
+}
         .onDisappear {
             stopPlayer()
         }
