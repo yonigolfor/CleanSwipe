@@ -17,9 +17,9 @@ struct SwipeIndicator: View {
     }
     
     private var scale: CGFloat {
-        let distance = offset.magnitude
-        return min(1.0 + (distance / 500), 1.3)
-    }
+    let distance = offset.magnitude
+    return min(distance / 100, 1.0)
+}
     
     var body: some View {
         Group {
@@ -38,8 +38,8 @@ struct SwipeIndicator: View {
             }
         }
         .opacity(opacity)
-        .scaleEffect(scale)
-        .animation(.spring(response: 0.3), value: direction)
+.scaleEffect(scale)
+.animation(nil, value: scale)
     }
     
     // MARK: - Indicators

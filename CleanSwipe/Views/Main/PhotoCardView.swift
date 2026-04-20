@@ -77,25 +77,30 @@ if item.isVideo {
                     fallbackVideoThumbnail
                 }
 
-                // Duration badge (bottom-left)
+                // Bottom bar: progress + duration
                 VStack {
                     Spacer()
-                    HStack {
-                        Image(systemName: player != nil ? "stop.circle.fill" : "play.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.white)
-
-                        Text(item.durationString)
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-
-                        Spacer()
+                    VStack(spacing: 8) {
+                        if let player = player {
+                            VideoProgressBar(player: player, duration: item.duration)
+                                .padding(.horizontal, 16)
+                        }
+                        HStack {
+                            Image(systemName: "video.fill")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                            Text(item.durationString)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
                     }
-                    .padding()
                     .background(
                         LinearGradient(
-                            colors: [.clear, .black.opacity(0.6)],
+                            colors: [.clear, .black.opacity(0.7)],
                             startPoint: .top,
                             endPoint: .bottom
                         )
