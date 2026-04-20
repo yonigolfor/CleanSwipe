@@ -32,43 +32,42 @@ struct ContentView: View {
     // MARK: - Main Tab View
     
     private var mainTabView: some View {
+        VStack(alignment: .center) {
         TabView(selection: $selectedTab) {
-            // Swipe Stack (Main)
             SwipeStackView(selectedTab: $selectedTab)
                 .environmentObject(stackViewModel)
-                .tabItem {
-                    Label("Swipe", systemImage: "rectangle.stack")
-                }
                 .tag(0)
-            
-            // Smart Filters
+
             SmartFiltersView(selectedTab: $selectedTab)
                 .environmentObject(stackViewModel)
-                .tabItem {
-                    Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
-                }
                 .tag(1)
-            
-            // Review Bin
+
             ReviewBinView()
                 .environmentObject(stackViewModel)
-                .tabItem {
-                    Label("Review", systemImage: "trash")
-                }
-                .badge(stackViewModel.reviewBin.count)
                 .tag(2)
         }
-        .accentColor(.blue)
-        .onChange(of: selectedTab) { _, newTab in
-    if newTab == 0 {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            NotificationCenter.default.post(name: .resumeVideoObserver, object: nil)
+        .ignoresSafeArea()
+        .onAppear {
+            UITabBar.appearance().isHidden = true
         }
-    } else {
-        NotificationCenter.default.post(name: .stopCurrentVideo, object: nil)
+
+         GlassmorphicTabBar(
+            selectedTab: $selectedTab,
+            reviewBinCount: stackViewModel.reviewBin.count
+        )
+        .padding(.bottom, 8)
+        
+    }
+    .onChange(of: selectedTab) { _, newTab in
+        if newTab == 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(name: .resumeVideoObserver, object: nil)
+            }
+        } else {
+            NotificationCenter.default.post(name: .stopCurrentVideo, object: nil)
+        }
     }
 }
-    }
     
     // MARK: - Authorization View
     
