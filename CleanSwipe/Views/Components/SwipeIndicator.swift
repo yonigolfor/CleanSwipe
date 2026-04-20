@@ -39,6 +39,8 @@ struct SwipeIndicator: View {
         }
         .opacity(opacity)
 .scaleEffect(scale)
+.frame(maxWidth: .infinity, alignment: direction == .right ? .trailing : direction == .left ? .leading : .center)
+.padding(.horizontal, 40)
 .animation(nil, value: scale)
     }
     
