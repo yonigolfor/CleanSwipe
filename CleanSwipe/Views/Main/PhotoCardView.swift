@@ -11,6 +11,7 @@ import AVKit
 
 extension Notification.Name {
     static let stopCurrentVideo = Notification.Name("stopCurrentVideo")
+    static let resumeVideoObserver = Notification.Name("resumeVideoObserver")
 }
 
 struct PhotoCardView: View {
@@ -205,13 +206,14 @@ VStack {
             stopPlayer()
         }
         .onChange(of: isTopCard) { _, nowTop in
-            if nowTop {
-                player?.seek(to: .zero)
-                player?.play()
-            } else {
-                stopPlayer()
-            }
-        }
+    if nowTop {
+        player?.seek(to: .zero)
+        player?.play()
+        NotificationCenter.default.post(name: .resumeVideoObserver, object: nil)
+    } else {
+        stopPlayer()
+    }
+}
         .onReceive(NotificationCenter.default.publisher(for: .stopCurrentVideo)) { _ in
             stopPlayer()
         }
@@ -220,6 +222,7 @@ VStack {
     // MARK: - Stop Player
     private func stopPlayer() {
         player?.pause()
+        player?.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 
     // MARK: - Fallback thumbnail for video

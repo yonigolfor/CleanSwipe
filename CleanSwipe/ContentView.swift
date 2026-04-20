@@ -59,6 +59,15 @@ struct ContentView: View {
                 .tag(2)
         }
         .accentColor(.blue)
+        .onChange(of: selectedTab) { _, newTab in
+    if newTab == 0 {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            NotificationCenter.default.post(name: .resumeVideoObserver, object: nil)
+        }
+    } else {
+        NotificationCenter.default.post(name: .stopCurrentVideo, object: nil)
+    }
+}
     }
     
     // MARK: - Authorization View

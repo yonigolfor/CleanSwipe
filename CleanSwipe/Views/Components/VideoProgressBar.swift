@@ -12,28 +12,25 @@ struct VideoProgressBar: View {
 
     @State private var progress: Double = 0
     @State private var isDragging = false
-    @State private var timeObserver: Any?
+    @StateObject private var coordinator = PlayerCoordinator()
     private let haptic = UISelectionFeedbackGenerator()
 
     var body: some View {
         VStack(spacing: 4) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    // Track
                     Capsule()
                         .fill(Color.white.opacity(0.3))
                         .frame(height: isDragging ? 6 : 4)
 
-                    // Fill
                     Capsule()
                         .fill(Color.white)
                         .frame(width: geo.size.width * progress, height: isDragging ? 6 : 4)
 
-                    // Thumb
                     Circle()
                         .fill(Color.white)
                         .frame(width: isDragging ? 16 : 10, height: isDragging ? 16 : 10)
-                        .offset(x: geo.size.width * progress - (isDragging ? 8 : 5))
+                        .offset(x: max(0, geo.size.width * progress - (isDragging ? 8 : 5)))
                         .shadow(radius: 2)
                 }
                 .animation(.easeInOut(duration: 0.15), value: isDragging)
@@ -41,8 +38,9 @@ struct VideoProgressBar: View {
                 .highPriorityGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
+                            guard duration > 0 else { return }
                             isDragging = true
-                            removeObserver()
+                            coordinator.stopObserving()
                             let newProgress = min(max(value.location.x / geo.size.width, 0), 1)
                             progress = newProgress
                             haptic.selectionChanged()
@@ -54,7 +52,12 @@ struct VideoProgressBar: View {
                         }
                         .onEnded { _ in
                             isDragging = false
-                            startObserver()
+                            coordinator.startObserving(player: player) { time in
+                                guard !isDragging, duration > 0 else { return }
+                                let current = time.seconds
+                                guard current.isFinite else { return }
+                                progress = min(max(current / duration, 0), 1)
+                            }
                         }
                 )
             }
@@ -72,34 +75,67 @@ struct VideoProgressBar: View {
         }
         .onAppear {
             haptic.prepare()
-            startObserver()
+            progress = 0
+            startObserving()
         }
         .onDisappear {
-            removeObserver()
+            coordinator.stopObserving()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .stopCurrentVideo)) { _ in
+            coordinator.stopObserving()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .resumeVideoObserver)) { _ in
+            progress = 0
+            startObserving()
         }
     }
 
-    private func startObserver() {
-        removeObserver()
-        let interval = CMTime(seconds: 1.0 / 60.0, preferredTimescale: 600)
-        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+    private func startObserving() {
+        coordinator.startObserving(player: player) { time in
             guard !isDragging, duration > 0 else { return }
             let current = time.seconds
-            guard !current.isNaN else { return }
+            guard current.isFinite else { return }
             progress = min(max(current / duration, 0), 1)
         }
     }
 
-    private func removeObserver() {
-        if let observer = timeObserver {
-            player.removeTimeObserver(observer)
-            timeObserver = nil
+    private func formatTime(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds >= 0 else { return "0:00" }
+        let s = Int(seconds)
+        return String(format: "%d:%02d", s / 60, s % 60)
+    }
+}
+
+// MARK: - PlayerCoordinator
+private class PlayerCoordinator: ObservableObject {
+    private weak var observedPlayer: AVPlayer?
+    private var timeObserver: Any?
+
+    func startObserving(player: AVPlayer, onTick: @escaping (CMTime) -> Void) {
+        stopObserving()
+        observedPlayer = player
+        let interval = CMTime(seconds: 1.0 / 60.0, preferredTimescale: 600)
+        timeObserver = player.addPeriodicTimeObserver(
+            forInterval: interval,
+            queue: .main
+        ) { time in
+            onTick(time)
         }
     }
 
-    private func formatTime(_ seconds: Double) -> String {
-        guard !seconds.isNaN, seconds >= 0 else { return "0:00" }
-        let s = Int(seconds)
-        return String(format: "%d:%02d", s / 60, s % 60)
+    func stopObserving() {
+        guard let observer = timeObserver,
+              let player = observedPlayer else {
+            timeObserver = nil
+            observedPlayer = nil
+            return
+        }
+        player.removeTimeObserver(observer)
+        timeObserver = nil
+        observedPlayer = nil
+    }
+
+    deinit {
+        stopObserving()
     }
 }
