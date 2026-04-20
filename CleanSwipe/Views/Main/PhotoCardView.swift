@@ -16,11 +16,12 @@ extension Notification.Name {
 struct PhotoCardView: View {
     let item: PhotoItem
     let isTopCard: Bool
+    static var globalMute = false
 
     @State private var image: UIImage?
     @State private var isLoading = true
     @State private var player: AVPlayer?
-    @State private var isMuted = false
+    @State private var isMuted = PhotoCardView.globalMute
 
 
     var body: some View {
@@ -49,7 +50,8 @@ struct PhotoCardView: View {
     .clipped()
     .onTapGesture {
         isMuted.toggle()
-        player.isMuted = isMuted
+PhotoCardView.globalMute = isMuted
+player.isMuted = isMuted
     }
 
 if isMuted {
@@ -251,9 +253,10 @@ if isMuted {
                 self.player = avPlayer
                 self.isLoading = false
                 // Auto-play if already the top card
-                if self.isTopCard {
-                    avPlayer.play()
-                }
+               avPlayer.isMuted = PhotoCardView.globalMute
+if self.isTopCard {
+    avPlayer.play()
+}
             }
         }
     }
