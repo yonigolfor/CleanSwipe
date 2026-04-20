@@ -9,10 +9,7 @@ struct GlassmorphicTabBar: View {
     @Binding var selectedTab: Int
     let reviewBinCount: Int
 
-    @GestureState private var dragOffset: CGFloat = 0
-    @State private var bubbleX: CGFloat = 0
-
-    private let haptic = UIImpactFeedbackGenerator(style: .light)
+    private let haptic = UIImpactFeedbackGenerator(style: .soft)
 
     private let tabs: [(icon: String, label: String)] = [
         ("rectangle.stack", "Swipe"),
@@ -21,67 +18,30 @@ struct GlassmorphicTabBar: View {
     ]
 
     var body: some View {
-        GeometryReader { geo in
-            let tabWidth = (geo.size.width) / CGFloat(tabs.count)
-            let activeBubbleX = tabWidth * CGFloat(selectedTab) + tabWidth / 2
-
-            ZStack(alignment: .leading) {
-                // Capsule background
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
-                    }
-                    .shadow(color: .black.opacity(0.08), radius: 20, x: 0, y: 10)
-                    .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: 2)
-
-                // Drag bubble
-                if dragOffset != 0 {
-                    Circle()
-                        .fill(.white.opacity(0.15))
-                        .frame(width: 44, height: 44)
-                        .position(
-                            x: min(max(activeBubbleX + dragOffset, tabWidth / 2), geo.size.width - tabWidth / 2),
-                            y: geo.size.height / 2
-                        )
-                        .animation(.interactiveSpring(), value: dragOffset)
-                }
-
-                // Tab buttons
-                HStack(spacing: 0) {
-                    ForEach(0..<tabs.count, id: \.self) { index in
-                        tabButton(index: index)
-                    }
-                }
+        HStack(spacing: 0) {
+            ForEach(0..<tabs.count, id: \.self) { index in
+                tabButton(index: index)
             }
-            .simultaneousGesture(
-            DragGesture(minimumDistance: 10)
-                .updating($dragOffset) { value, state, _ in
-                    state = value.translation.width
-                }
-                .onEnded { value in
-                    let threshold: CGFloat = 40
-                    if value.translation.width < -threshold {
-                        let next = min(selectedTab + 1, tabs.count - 1)
-                        guard next != selectedTab else { return }
-                        haptic.impactOccurred()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            selectedTab = next
-                        }
-                    } else if value.translation.width > threshold {
-                        let prev = max(selectedTab - 1, 0)
-                        guard prev != selectedTab else { return }
-                        haptic.impactOccurred()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                            selectedTab = prev
-                        }
-                    }
-                }
-        )
         }
-        .frame(height: 60)
-        .padding(.horizontal, 40)
+        .padding(.top, 10)
+        .padding(.bottom, 4)
+        .background {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    Color.white.opacity(0.05)
+                }
+                .overlay(alignment: .top) {
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.25), Color.white.opacity(0)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(height: 0.5)
+                }
+                .shadow(color: .black.opacity(0.08), radius: 20, x: 0, y: -10)
+                .shadow(color: .black.opacity(0.04), radius: 4, x: 0, y: -2)
+        }
         .onAppear { haptic.prepare() }
     }
 
@@ -98,21 +58,22 @@ struct GlassmorphicTabBar: View {
             }
         } label: {
             ZStack {
+                // Iridescent glow
                 if isSelected {
                     AngularGradient(
                         colors: [.cyan, .purple, .pink, Color(red: 1, green: 0.8, blue: 0.2), .cyan],
                         center: .center
                     )
-                    .blur(radius: 10)
-                    .opacity(0.3)
-                    .frame(width: 50, height: 50)
+                    .blur(radius: 15)
+                    .opacity(0.25)
+                    .frame(width: 60, height: 60)
                     .clipShape(Circle())
                 }
 
                 VStack(spacing: 4) {
                     ZStack {
                         Image(systemName: isSelected ? tab.icon + ".fill" : tab.icon)
-                            .font(.system(size: 20, weight: isSelected ? .semibold : .regular))
+                            .font(.system(size: 22, weight: isSelected ? .semibold : .regular))
                             .foregroundColor(isSelected ? .primary : .secondary)
                             .scaleEffect(isSelected ? 1.15 : 1.0)
                             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
@@ -123,7 +84,7 @@ struct GlassmorphicTabBar: View {
                                 .foregroundColor(.white)
                                 .padding(3)
                                 .background(Circle().fill(Color.red))
-                                .offset(x: 10, y: -10)
+                                .offset(x: 12, y: -12)
                         }
                     }
 
@@ -132,7 +93,7 @@ struct GlassmorphicTabBar: View {
                         .foregroundColor(isSelected ? .primary : .secondary)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
+                .padding(.vertical, 4)
             }
         }
         .buttonStyle(.plain)
