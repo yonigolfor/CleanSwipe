@@ -2,6 +2,8 @@ import SwiftUI
 
 struct VictoryView: View {
     let onEmptyBin: () -> Void
+    var onImportPhotos: (() -> Void)? = nil
+    var reviewBinCount: Int = 0
     
     var body: some View {
         VStack(spacing: 25) {
@@ -25,26 +27,46 @@ struct VictoryView: View {
             
             VStack(spacing: 12) {
                 Text("Gallery Cleaned! 🎉")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .minimumScaleFactor(0.8)
+                    .lineLimit(1)
+
                 Text("You've cleared your stack for now.\nCome back later for more!")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal)
             }
             
              // CTA
-            Button(action: onEmptyBin) {
-                Text("Empty Review Bin")
-                    .font(.headline)
-                    .foregroundColor(.white)
+            if reviewBinCount > 0 {
+                Button(action: onEmptyBin) {
+                    Text("Empty Review Bin (\(reviewBinCount))")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Capsule().fill(Color.red.gradient))
+                }
+                .padding(.horizontal)
+            }
+
+            if let onImportPhotos {
+                Button(action: onImportPhotos) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "gear")
+                        Text("Allow More Photos in Settings")
+                            .font(.headline)
+                    }
+                    .foregroundColor(.blue)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Capsule().fill(Color.red.gradient))
-            }
-            .padding(.horizontal)
+                    .background(Capsule().fill(Color.blue.opacity(0.1)))
+                }
+                .padding(.horizontal)
+            }          
             
             Spacer()
         }

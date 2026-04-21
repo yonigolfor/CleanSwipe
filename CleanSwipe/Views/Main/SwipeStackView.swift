@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Photos
 
 struct SwipeStackView: View {
     // Use the shared VM passed from ContentView — fixes the ReviewBin empty bug
@@ -37,8 +38,15 @@ struct SwipeStackView: View {
                         let _ = print("🔄 ZStack rerender, stack count: \(viewModel.photoStack.count)")
 
                         if viewModel.photoStack.isEmpty {
-                            VictoryView(onEmptyBin: { selectedTab = 2 })
-                                .id("victory")
+                            VictoryView(
+                                onEmptyBin: { selectedTab = 2 },
+                                onImportPhotos: PHPhotoLibrary.authorizationStatus(for: .readWrite) == .limited ? {
+                                    guard let url = URL(string: UIApplication.openSettingsURLString),
+                                          UIApplication.shared.canOpenURL(url) else { return }
+                                    UIApplication.shared.open(url)
+                                } : nil, reviewBinCount: viewModel.reviewBin.count
+    )
+    .id("victory")
                         } else {
                             ForEach(
                                 Array(viewModel.photoStack.prefix(cardStackSize).enumerated()),
