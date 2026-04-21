@@ -11,23 +11,28 @@ import UIKit
 /// שירות לגישה ל-Photo Library
 class PhotoLibraryService: ObservableObject {
     static let shared = PhotoLibraryService()
-    
+
     @Published var authorizationStatus: PHAuthorizationStatus = .notDetermined
-    @Published var allPhotos: [PhotoItem] = []
-    
+
     private let imageManager = PHCachingImageManager()
-    private var fetchResult: PHFetchResult<PHAsset>?
-    
+
+    // The raw PHFetchResult — treated as a lazy index, never fully enumerated.
+    // Access individual objects with object(at:) or bounded ranges only.
+    private(set) var fetchResult: PHFetchResult<PHAsset>?
+
+    /// Total number of assets in the current fetch result (O(1)).
+    var totalAssetCount: Int { fetchResult?.count ?? 0 }
+
     private init() {
         checkAuthorization()
     }
-    
+
     // MARK: - Authorization
-    
+
     func checkAuthorization() {
         authorizationStatus = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     }
-    
+
     func requestAuthorization() async -> Bool {
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         await MainActor.run {
@@ -35,80 +40,159 @@ class PhotoLibraryService: ObservableObject {
         }
         return status == .authorized || status == .limited
     }
-    
-    // MARK: - Fetch Photos
-    
-    /// טעינת כל התמונות מהגלריה
+
+    // MARK: - Fetch Setup (no enumeration)
+
+    /// Refreshes the fetch result without enumerating any objects.
+    /// Returns the result so callers can store the count if needed.
     @discardableResult
     func fetchAllPhotos() -> PHFetchResult<PHAsset> {
         let options = PHFetchOptions()
         options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
-        
         let result = PHAsset.fetchAssets(with: options)
         fetchResult = result
-        
-        var items: [PhotoItem] = []
-                result.enumerateObjects { asset, _, _ in
-                    items.append(PhotoItem(asset: asset))
-                }
-                
-                self.allPhotos = items
-                return result
-            }
-    
-    /// סינון לפי קטגוריה
-    func fetchPhotos(for category: FilterCategory) -> [PhotoItem] {
-        guard let fetchResult = fetchResult else { return [] }
-        
-        var items: [PhotoItem] = []
-        
-        fetchResult.enumerateObjects { asset, _, _ in
-            let item = PhotoItem(asset: asset)
-            
+        return result
+    }
+
+    // MARK: - Paginated Loading
+
+    /// Fetches a page of PhotoItems for the given category, starting at `startIndex`
+    /// in the underlying PHFetchResult, skipping any asset whose ID is in `excluding`.
+    ///
+    /// Only `pageSize` (at most) objects are ever instantiated — avoids allocating
+    /// 50 k PhotoItem wrappers up front.
+    ///
+    /// - Returns: A tuple of the collected items and the next fetch-result index
+    ///   to resume from on the next page call (or `nil` if the result is exhausted).
+    func fetchPageOfAssets(
+        for category: FilterCategory,
+        startIndex: Int,
+        pageSize: Int,
+        excluding processedIDs: Set<String>
+    ) -> (items: [PhotoItem], nextIndex: Int?) {
+        guard let fetchResult = fetchResult, fetchResult.count > 0 else {
+            return ([], nil)
+        }
+
+        var collected: [PhotoItem] = []
+        collected.reserveCapacity(pageSize)
+        var idx = startIndex
+        let total = fetchResult.count
+
+        while idx < total && collected.count < pageSize {
+            let asset = fetchResult.object(at: idx)
+            idx += 1
+
+            // Skip already-processed assets without creating a PhotoItem.
+            guard !processedIDs.contains(asset.localIdentifier) else { continue }
+
+            // Apply category filter using only PHAsset properties (no PhotoItem needed
+            // for the fast path — only allocate PhotoItem when the asset qualifies).
             switch category {
             case .all:
-                items.append(item)
-                
+                collected.append(PhotoItem(asset: asset))
+
             case .screenshots:
-                if item.isScreenshot {
-                    items.append(item)
+                if asset.isScreenshot {
+                    collected.append(PhotoItem(asset: asset))
                 }
-                
+
             case .screenRecordings:
-                if item.isScreenRecording {
-                    items.append(item)
+                if asset.isScreenRecording {
+                    collected.append(PhotoItem(asset: asset))
                 }
-                
+
             case .largeVideos:
-                if item.isVideo && item.fileSize > 50_000_000 { // > 50MB
-                    items.append(item)
+                // fileSize requires PHAssetResource — create item only to read it.
+                let item = PhotoItem(asset: asset)
+                if item.isVideo && item.fileSize > 50_000_000 {
+                    collected.append(item)
                 }
-                
+
             case .burstPhotos:
-                items.append(item) // נחזיר הכל, ה-BurstAnalyzer יקבץ לפי timestamp
-                
+                // BurstAnalyzer needs a full pool; handled via fetchPageOfAssets
+                // with a larger page in the ViewModel.
+                collected.append(PhotoItem(asset: asset))
+
             case .blurryPhotos:
-                break // מטופל ב-PhotoStackViewModel
+                // Only images, not screenshots; blur check done in ViewModel.
+                if asset.mediaType == .image && !asset.isScreenshot {
+                    collected.append(PhotoItem(asset: asset))
+                }
             }
         }
-        
-        // מיון לפי גודל קובץ (הגדולים ראשונים)
+
+        // Sort large videos by file size descending (only the current page).
         if category == .largeVideos {
-            items.sort { $0.fileSize > $1.fileSize }
+            collected.sort { $0.fileSize > $1.fileSize }
         }
-        
-        return items
+
+        let nextIndex: Int? = (idx < total) ? idx : nil
+        return (collected, nextIndex)
     }
-    
+
+    // MARK: - Targeted Asset Lookup
+
+    /// Fetches specific assets by their local identifiers — used for bin restoration.
+    /// Much cheaper than building a full-library map.
+    func fetchAssets(forIDs ids: [String]) -> [String: PHAsset] {
+        guard !ids.isEmpty else { return [:] }
+        let result = PHAsset.fetchAssets(
+            withLocalIdentifiers: ids,
+            options: nil
+        )
+        var map: [String: PHAsset] = [:]
+        map.reserveCapacity(result.count)
+        result.enumerateObjects { asset, _, _ in
+            map[asset.localIdentifier] = asset
+        }
+        return map
+    }
+
+    // MARK: - Count (fast path)
+
+    /// Approximate count of assets for a category, excluding processed IDs.
+    /// For `.all`, this is O(1). Other categories still enumerate but benefit
+    /// from the in-memory PHFetchResult cache.
+    func count(for category: FilterCategory, excluding processedIDs: Set<String> = []) -> Int {
+        guard let fetchResult = fetchResult else { return 0 }
+
+        // Fast path: total minus already-processed.
+        if category == .all {
+            return max(0, fetchResult.count - processedIDs.count)
+        }
+
+        // For filtered categories, walk the result (PHFetchResult is already in-memory).
+        var count = 0
+        fetchResult.enumerateObjects { asset, _, _ in
+            guard !processedIDs.contains(asset.localIdentifier) else { return }
+            switch category {
+            case .all: count += 1
+            case .screenshots:
+                if asset.isScreenshot { count += 1 }
+            case .screenRecordings:
+                if asset.isScreenRecording { count += 1 }
+            case .largeVideos:
+                let item = PhotoItem(asset: asset)
+                if item.isVideo && item.fileSize > 50_000_000 { count += 1 }
+            case .burstPhotos:
+                count += 1
+            case .blurryPhotos:
+                if asset.mediaType == .image && !asset.isScreenshot { count += 1 }
+            }
+        }
+        return count
+    }
+
     // MARK: - Image Loading
-    
-    /// טעינת תמונה עבור asset
+
+    /// Loads an image for a given asset asynchronously.
     func loadImage(for asset: PHAsset, targetSize: CGSize, completion: @escaping (UIImage?) -> Void) {
         let options = PHImageRequestOptions()
         options.deliveryMode = .highQualityFormat
         options.isNetworkAccessAllowed = true
         options.isSynchronous = false
-        
+
         imageManager.requestImage(
             for: asset,
             targetSize: targetSize,
@@ -118,8 +202,8 @@ class PhotoLibraryService: ObservableObject {
             completion(image)
         }
     }
-    
-    /// Start caching עבור assets
+
+    /// Starts image caching for a set of assets.
     func startCaching(for items: [PhotoItem], targetSize: CGSize) {
         let assets = items.map { $0.asset }
         imageManager.startCachingImages(
@@ -129,8 +213,8 @@ class PhotoLibraryService: ObservableObject {
             options: nil
         )
     }
-    
-    /// Stop caching
+
+    /// Stops image caching for a set of assets.
     func stopCaching(for items: [PhotoItem]) {
         let assets = items.map { $0.asset }
         imageManager.stopCachingImages(
@@ -140,55 +224,13 @@ class PhotoLibraryService: ObservableObject {
             options: nil
         )
     }
-    
+
     // MARK: - Deletion
-    
-    /// מחיקת assets
+
+    /// Permanently deletes the given assets from the photo library.
     func deleteAssets(_ assets: [PHAsset]) async throws {
         try await PHPhotoLibrary.shared().performChanges {
             PHAssetChangeRequest.deleteAssets(assets as NSArray)
         }
-    }
-    
-    /// ספירת פריטים לפי קטגוריה
-    func count(for category: FilterCategory, excluding processedIDs: Set<String> = []) -> Int {
-        guard let fetchResult = fetchResult else { return 0 }
-        
-        var count = 0
-        
-        fetchResult.enumerateObjects { asset, _, stop in
-            guard !processedIDs.contains(asset.localIdentifier) else { return }
-            let item = PhotoItem(asset: asset)
-            
-            switch category {
-            case .all:
-                count += 1
-                
-            case .screenshots:
-                if item.isScreenshot { count += 1 }
-                
-            case .screenRecordings:
-                if item.isScreenRecording { count += 1 }
-                
-            case .largeVideos:
-                if item.isVideo && item.fileSize > 50_000_000 { count += 1 }
-                
-            case .burstPhotos:
-                count += 1
-                
-            case .blurryPhotos:
-                if !item.isVideo && !item.isScreenshot { count += 1 } // approximation
-            }
-        }
-        
-        return count
-    }
-    func fetchAllAssetsMap() -> [String: PHAsset] {
-        let result = PHAsset.fetchAssets(with: nil)
-        var map: [String: PHAsset] = [:]
-        result.enumerateObjects { asset, _, _ in
-            map[asset.localIdentifier] = asset
-        }
-        return map
     }
 }

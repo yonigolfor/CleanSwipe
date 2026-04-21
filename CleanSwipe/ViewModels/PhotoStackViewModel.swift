@@ -29,6 +29,24 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     private(set) var processedAssetIDs: Set<String> = []
     private var lastAction: (item: PhotoItem, action: SwipeAction)?
 
+    // MARK: - Pagination State
+
+    /// The index in the PHFetchResult where the next page load will resume.
+    /// Reset to 0 whenever the filter changes or the library is refreshed.
+    private var fetchCursor: Int = 0
+
+    /// True while a background page-fetch is in flight — prevents concurrent fetches.
+    private var isFetchingNextPage = false
+
+    /// Number of PhotoItems to materialize in the initial load.
+    private let initialPageSize = 50
+
+    /// Number of PhotoItems to add per subsequent page.
+    private let nextPageSize = 30
+
+    /// When the stack drops to this many items, prefetch the next page.
+    private let lowWatermark = 12
+
     // MARK: - Services
 
     private let photoService = PhotoLibraryService.shared
@@ -68,25 +86,53 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         PHPhotoLibrary.shared().register(self)
     }
 
+    // MARK: - PHPhotoLibraryChangeObserver
+
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
         Task { @MainActor in
-            self.photoService.fetchAllPhotos() // מרענן את fetchResult
-            let existingIDs = Set(self.photoStack.map { $0.id })
-            let all = self.photoService.fetchPhotos(for: self.currentFilter)
-            let newItems = all.filter {
-                !self.processedAssetIDs.contains($0.id) && !existingIDs.contains($0.id)
+            guard let oldResult = self.photoService.fetchResult else {
+                // No prior fetch — do a full initial load.
+                self.photoService.fetchAllPhotos()
+                self.resetAndLoad(filter: self.currentFilter)
+                return
             }
+
+            // Refresh the fetch result (no enumeration — O(1) index update).
+            let newResult = self.photoService.fetchAllPhotos()
+
+            guard let details = changeInstance.changeDetails(for: oldResult) else { return }
+
+            // Only act on insertions.
+            guard details.hasIncrementalChanges,
+                  let insertedIndexes = details.insertedIndexes,
+                  !insertedIndexes.isEmpty else { return }
+
+            // Newly inserted assets arrive at the top (newest-first sort).
+            // Collect only those not already seen.
+            let existingIDs = Set(self.photoStack.map { $0.id })
+            var newItems: [PhotoItem] = []
+
+            insertedIndexes.forEach { idx in
+                let asset = newResult.object(at: idx)
+                guard !self.processedAssetIDs.contains(asset.localIdentifier),
+                      !existingIDs.contains(asset.localIdentifier) else { return }
+                newItems.append(PhotoItem(asset: asset))
+            }
+
             guard !newItems.isEmpty else { return }
-            self.photoStack.append(contentsOf: newItems)
+            self.photoStack.insert(contentsOf: newItems, at: 0)
         }
     }
-    
+
+    // MARK: - Bin Restoration
+
     private func restoreBinFromDisk() {
         let savedIDs = persistence.reviewBinIDs
         guard !savedIDs.isEmpty else { return }
-        let all = photoService.fetchAllAssetsMap()
+        // Targeted fetch — only the IDs we actually need, not the full library.
+        let assetMap = photoService.fetchAssets(forIDs: savedIDs)
         let items = savedIDs.compactMap { id -> PhotoItem? in
-            guard let asset = all[id] else { return nil }
+            guard let asset = assetMap[id] else { return nil }
             return PhotoItem(asset: asset)
         }
         self.reviewBin = items
@@ -97,20 +143,49 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     // MARK: - Data Loading
 
     /// Loads photos for the given filter, always excluding already-processed assets.
+    /// Only the first `initialPageSize` items are materialised up front; more are
+    /// fetched lazily as the user swipes (see `loadNextPageIfNeeded`).
     func loadPhotos(filter: FilterCategory = .all) {
+        resetAndLoad(filter: filter)
+    }
+
+    /// Resets the cursor and kicks off an initial page fetch for `filter`.
+    private func resetAndLoad(filter: FilterCategory) {
         isLoading = true
         currentFilter = filter
+        fetchCursor = 0
+        isFetchingNextPage = false
 
         Task {
-            // Fetch from library, then strip out anything already acted upon
-            let all = photoService.fetchPhotos(for: filter)
-            var items = all.filter { !processedAssetIDs.contains($0.id) }
+            // Ensure we have an up-to-date fetch result (no-op if already fresh).
+            if photoService.fetchResult == nil {
+                photoService.fetchAllPhotos()
+            }
+
+            let pageSize: Int
+            switch filter {
+            case .burstPhotos:  pageSize = 500  // BurstAnalyzer needs a pool
+            case .blurryPhotos: pageSize = 200  // Enough to find blurry images
+            default:            pageSize = initialPageSize
+            }
+
+            let (rawItems, nextIdx) = photoService.fetchPageOfAssets(
+                for: filter,
+                startIndex: 0,
+                pageSize: pageSize,
+                excluding: processedAssetIDs
+            )
+
+            self.fetchCursor = nextIdx ?? photoService.totalAssetCount
+
+            var items = rawItems
             if filter == .burstPhotos {
                 items = await BurstAnalyzer.shared.analyze(items)
             } else if filter == .blurryPhotos {
                 items = await filterBlurry(items)
             }
-            print("📸 total fetched: \(all.count), after filter: \(items.count), processedIDs: \(processedAssetIDs.count)")
+
+            print("📸 initial page: \(items.count) items, cursor: \(self.fetchCursor)/\(self.photoService.totalAssetCount)")
 
             await MainActor.run {
                 self.photoStack = items
@@ -122,6 +197,44 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
                         targetSize: CGSize(width: 400, height: 600)
                     )
                 }
+            }
+        }
+    }
+
+    /// Appends the next page of assets to `photoStack` when the stack is running low.
+    /// No-op for filters that need up-front analysis (burst / blurry) since their
+    /// pool is already bounded by the initial large page.
+    private func loadNextPageIfNeeded() {
+        guard !isFetchingNextPage,
+              photoStack.count <= lowWatermark,
+              fetchCursor < photoService.totalAssetCount,
+              currentFilter != .burstPhotos,
+              currentFilter != .blurryPhotos else { return }
+
+        isFetchingNextPage = true
+
+        Task {
+            let (rawItems, nextIdx) = photoService.fetchPageOfAssets(
+                for: currentFilter,
+                startIndex: fetchCursor,
+                pageSize: nextPageSize,
+                excluding: processedAssetIDs
+            )
+
+            let newFetchCursor = nextIdx ?? photoService.totalAssetCount
+
+            print("📸 next page: \(rawItems.count) items, cursor: \(newFetchCursor)/\(self.photoService.totalAssetCount)")
+
+            await MainActor.run {
+                if !rawItems.isEmpty {
+                    self.photoStack.append(contentsOf: rawItems)
+                    photoService.startCaching(
+                        for: rawItems,
+                        targetSize: CGSize(width: 400, height: 600)
+                    )
+                }
+                self.fetchCursor = newFetchCursor
+                self.isFetchingNextPage = false
             }
         }
     }
@@ -148,6 +261,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         photoStack.removeFirst()
         hapticService.keep()
         precacheNextImages()
+        loadNextPageIfNeeded()
     }
 
     /// Swipe Left — Delete (moves to Review Bin)
@@ -161,6 +275,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         hapticService.delete()
         precacheNextImages()
         saveBinToDisk()
+        loadNextPageIfNeeded()
     }
 
     /// Swipe Up — Star Keeper
@@ -172,12 +287,13 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         topCard.isStarred = true
         hapticService.starKeeper()
         precacheNextImages()
+        loadNextPageIfNeeded()
         Task {
             try? await PHPhotoLibrary.shared().performChanges {
-                    let request = PHAssetChangeRequest(for: topCard.asset)
-                    request.isFavorite = true
-                }
+                let request = PHAssetChangeRequest(for: topCard.asset)
+                request.isFavorite = true
             }
+        }
     }
 
     /// Undo — restores the last deleted photo back to the top of the stack
@@ -205,9 +321,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     func restoreFromBin(_ item: PhotoItem) {
         guard let index = reviewBin.firstIndex(of: item) else { return }
         reviewBin.remove(at: index)
-        // Un-process so the item can be swiped again
         processedAssetIDs.remove(item.id)
-        // Ensure it's not in persistent kept IDs either (though it shouldn't be if it was in the bin)
         persistence.removeKeptID(item.id)
         totalSpaceSaved -= item.fileSize
         hapticService.selection()
@@ -218,10 +332,10 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     func emptyTrash() async throws {
         let assetsToDelete = reviewBin.map { $0.asset }
         let currentSaved = totalSpaceSaved
-        
+
         hapticService.emptyTrash()
         try await photoService.deleteAssets(assetsToDelete)
-        
+
         // Permanently-deleted IDs stay in processedAssetIDs — they can never
         // come back from the library anyway.
         await MainActor.run {
@@ -231,7 +345,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
             saveBinToDisk()
         }
     }
-    
+
     /// Resets all "Kept" decisions to start over
     func resetProgress() {
         persistence.keptPhotoIDs = []
@@ -287,6 +401,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         persistence.reviewBinIDs = reviewBin.map { $0.id }
         persistence.reviewBinSpaceSaved = totalSpaceSaved
     }
+
     private func precacheNextImages() {
         let nextItems = Array(photoStack.prefix(5))
         guard !nextItems.isEmpty else { return }
