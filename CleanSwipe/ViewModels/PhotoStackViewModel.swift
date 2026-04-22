@@ -341,6 +341,9 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         let assetsToDelete = reviewBin.map { $0.asset }
         let currentSaved = totalSpaceSaved
 
+        // Drain the video pool BEFORE deleting assets — AVPlayerItems hold
+        // strong references to PHAssets and will crash if accessed after deletion.
+        VideoPlayerPool.shared.drainAll()
         hapticService.emptyTrash()
         try await photoService.deleteAssets(assetsToDelete)
 

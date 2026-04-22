@@ -87,10 +87,20 @@ final class VideoPlayerPool {
     }
 
     /// Pauses all players in the pool.
-    /// Call this when the user navigates away from the Swipe tab.
-    func pauseAll() {
-        pool.values.forEach { $0.pause() }
-    }
+        /// Call this when the user navigates away from the Swipe tab.
+        func pauseAll() {
+            pool.values.forEach { $0.pause() }
+        }
+
+        /// Clears the entire pool and releases all AVPlayer instances.
+        /// MUST be called before permanently deleting assets from the photo library,
+        /// otherwise AVPlayerItems holding references to deleted assets will cause
+        /// EXC_BAD_ACCESS crashes.
+        func drainAll() {
+            let ids = Array(pool.keys)
+            ids.forEach { evict(id: $0) }
+            inFlight.removeAll()
+        }
 
     // MARK: - Private Helpers
 
