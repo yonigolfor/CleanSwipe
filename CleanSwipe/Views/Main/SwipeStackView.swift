@@ -105,6 +105,8 @@ struct SwipeStackView: View {
         }
         .onDisappear {
             NotificationCenter.default.post(name: .stopCurrentVideo, object: nil)
+            // Pause all pooled players when leaving the Swipe tab.
+            viewModel.pauseVideoPool()
         }
     }
     

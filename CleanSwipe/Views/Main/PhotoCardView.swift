@@ -204,6 +204,11 @@ VStack {
 }
         .onDisappear {
             stopPlayer()
+            // Release the pooled player for this asset so the pool
+            // can reclaim memory for upcoming assets.
+            if item.isVideo {
+                Task { await VideoPlayerPool.shared.release(for: item.asset) }
+            }
         }
         .onChange(of: isTopCard) { _, nowTop in
     if nowTop {
@@ -247,34 +252,50 @@ VStack {
     // MARK: - Video Player Loading
 
     private func loadVideoPlayer() {
-        let options = PHVideoRequestOptions()
-        options.deliveryMode = .automatic
-        options.isNetworkAccessAllowed = true
-
-        PHImageManager.default().requestPlayerItem(forVideo: item.asset, options: options) { playerItem, _ in
-            guard let playerItem = playerItem else {
-                DispatchQueue.main.async { self.isLoading = false }
+        Task { @MainActor in
+            // Try to get a pre-loaded player from the pool first.
+            // This is the fast path: no PHImageManager call needed.
+            if let pooledPlayer = VideoPlayerPool.shared.player(for: item.asset) {
+                pooledPlayer.isMuted = PhotoCardView.globalMute
+                self.player = pooledPlayer
+                self.isLoading = false
+                if self.isTopCard {
+                    await pooledPlayer.seek(to: .zero)
+                    pooledPlayer.play()
+                }
                 return
             }
-            DispatchQueue.main.async {
-                let avPlayer = AVPlayer(playerItem: playerItem)
-                // Loop the video
-                NotificationCenter.default.addObserver(
-                    forName: .AVPlayerItemDidPlayToEndTime,
-                    object: playerItem,
-                    queue: .main
-                ) { [weak avPlayer] _ in
-                    guard let avPlayer, avPlayer.currentItem != nil else { return }
-                    avPlayer.seek(to: .zero)
-                    avPlayer.play()
+
+            // Slow path: pool miss — load directly.
+            // This only happens for the very first video or if the pool
+            // has not had enough time to warm up.
+            let options = PHVideoRequestOptions()
+            options.deliveryMode = .automatic
+            options.isNetworkAccessAllowed = true
+
+            PHImageManager.default().requestPlayerItem(forVideo: item.asset, options: options) { playerItem, _ in
+                guard let playerItem else {
+                    DispatchQueue.main.async { self.isLoading = false }
+                    return
                 }
-                self.player = avPlayer
-                self.isLoading = false
-                // Auto-play if already the top card
-               avPlayer.isMuted = PhotoCardView.globalMute
-if self.isTopCard {
-    avPlayer.play()
-}
+                DispatchQueue.main.async {
+                    let avPlayer = AVPlayer(playerItem: playerItem)
+                    NotificationCenter.default.addObserver(
+                        forName: .AVPlayerItemDidPlayToEndTime,
+                        object: playerItem,
+                        queue: .main
+                    ) { [weak avPlayer] _ in
+                        guard let avPlayer, avPlayer.currentItem != nil else { return }
+                        avPlayer.seek(to: .zero)
+                        avPlayer.play()
+                    }
+                    avPlayer.isMuted = PhotoCardView.globalMute
+                    self.player = avPlayer
+                    self.isLoading = false
+                    if self.isTopCard {
+                        avPlayer.play()
+                    }
+                }
             }
         }
     }

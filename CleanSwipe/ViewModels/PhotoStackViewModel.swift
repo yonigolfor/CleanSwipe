@@ -196,6 +196,9 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
                         for: Array(items.prefix(10)),
                         targetSize: CGSize(width: 400, height: 600)
                     )
+                    // Pre-load video players for the first upcoming video assets.
+                    let firstAssets = Array(items.prefix(5)).map { $0.asset }
+                    Task { await VideoPlayerPool.shared.warmUp(for: firstAssets) }
                 }
             }
         }
@@ -244,6 +247,11 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     func refreshPhotos() {
         photoService.fetchAllPhotos()
         loadPhotos(filter: currentFilter)
+    }
+
+    /// Pauses all pooled video players. Call when the user leaves the Swipe tab.
+    func pauseVideoPool() {
+        Task { await VideoPlayerPool.shared.pauseAll() }
     }
 
     func count(for category: FilterCategory) -> Int {
@@ -409,5 +417,9 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
             for: nextItems,
             targetSize: CGSize(width: 400, height: 600)
         )
+        // Warm up the video player pool with the next upcoming video assets.
+        // VideoPlayerPool filters to videos only, so passing all items is safe.
+        let nextAssets = nextItems.map { $0.asset }
+        Task { await VideoPlayerPool.shared.warmUp(for: nextAssets) }
     }
 }
