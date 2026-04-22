@@ -14,6 +14,13 @@ struct SwipeStackView: View {
     @Binding var selectedTab: Int
     @State private var dragOffset: CGSize = .zero
     @State private var dragRotation: Double = 0
+
+    // Particle explosion state
+    @State private var showParticles = false
+    @State private var particleOrigin: CGPoint = .zero
+// Top-right destination — DopamineMeter is centered but particles fly to top-right
+    private let meterDestination = CGPoint(x: UIScreen.main.bounds.width - 40, y: 55)
+    private let largeFileSizeThreshold: Int64 = 2_000_000 // 2 MB for dev
     
     private let cardStackSize = 3 // כמה קלפים מציגים מאחור
     
@@ -95,6 +102,23 @@ struct SwipeStackView: View {
             )
             .padding(.top, 10)
             .zIndex(100)
+
+            // Particle explosion overlay — rendered above everything including DopamineMeter
+                        if showParticles {
+                            ParticleExplosionView(
+                                origin: particleOrigin,
+                                destination: meterDestination,
+                                color: .systemRed
+                            )
+                            .ignoresSafeArea()
+                            .allowsHitTesting(false)
+                            .zIndex(200)
+                            .onAppear {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                    showParticles = false
+                                }
+                            }
+                        }
         }
         .onShake {
             viewModel.undoLastAction()
@@ -143,9 +167,24 @@ struct SwipeStackView: View {
                     // incoming card never inherits the ±500 offset and slides in.
                     NotificationCenter.default.post(name: .stopCurrentVideo, object: nil)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        // Capture top card BEFORE performing action (it removes it from stack)
+                        let topCard = viewModel.topCard
+
                         viewModel.performAction(action)
                         dragOffset = .zero
                         dragRotation = 0
+
+                        // Trigger particle explosion if this was a delete of a large file
+                        if action == .delete,
+                           let card = topCard,
+                           card.fileSize >= largeFileSizeThreshold {
+                            // Particles spawn from the left edge where the card exits
+                            particleOrigin = CGPoint(
+                                x: 0,
+                                y: UIScreen.main.bounds.height / 2
+                            )
+                            showParticles = true
+                        }
                     }
                 } else {
                     // Spring back to centre
