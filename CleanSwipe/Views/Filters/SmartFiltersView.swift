@@ -20,12 +20,12 @@ struct SmartFiltersView: View {
                         filterRow(for: category)
                     }
                 } header: {
-                    Text("Smart Cleanup Categories")
-                } footer: {
-                    Text("Tap a category to start swiping through those specific items.")
-                }
+                                    Text(String(localized: "filters.section_header"))
+                                } footer: {
+                                    Text(String(localized: "filters.section_footer"))
+                                }
             }
-            .navigationTitle("Filters")
+            .navigationTitle(String(localized: "filters.title"))
             .navigationBarTitleDisplayMode(.large)
             .onAppear {
                 loadCounts()
@@ -58,7 +58,7 @@ struct SmartFiltersView: View {
                 
                 // Text
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(category.rawValue)
+                    Text(category.displayName)
                         .font(.headline)
                         .foregroundColor(.primary)
                     

@@ -12,7 +12,7 @@ struct LifetimeSavingsView: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Text("All-Time Storage Freed")
+            Text(String(localized: "bin.lifetime_saved"))
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundColor(.secondary)
@@ -42,7 +42,7 @@ struct LifetimeSavingsView: View {
                     )
             }
 
-            Text("Your phone is breathing easy 🌿")
+            Text(String(localized: "bin.breathing"))
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .padding(.top, 2)

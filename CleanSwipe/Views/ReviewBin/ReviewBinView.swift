@@ -74,7 +74,7 @@ struct ReviewBinView: View {
                     .zIndex(10)
                 }
             }
-            .navigationTitle("Review Bin")
+            .navigationTitle(String(localized: "bin.title"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 if !stackViewModel.reviewBin.isEmpty {
@@ -82,15 +82,15 @@ struct ReviewBinView: View {
                         Button {
                             viewModel.showDeleteConfirmation()
                         } label: {
-                            Label("Empty Trash", systemImage: "trash")
+                            Label(String(localized: "bin.empty_trash"), systemImage: "trash")
                                 .foregroundColor(.red)
                         }
                     }
                 }
             }
-            .alert("Empty Trash", isPresented: $viewModel.isShowingDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete \(stackViewModel.reviewBin.count) Items", role: .destructive) {
+            .alert(String(localized: "bin.alert_title"), isPresented: $viewModel.isShowingDeleteConfirmation) {
+                            Button(String(localized: "cancel"), role: .cancel) {}
+                            Button(String(format: String(localized: "bin.delete_button"), stackViewModel.reviewBin.count), role: .destructive) {
                     // Capture BEFORE emptyTrash zeroes it out
                     let savedText  = stackViewModel.spaceSavedText
                     let savedCount = stackViewModel.reviewBin.count
@@ -104,7 +104,7 @@ struct ReviewBinView: View {
                     }
                 }
             } message: {
-                Text("This will permanently delete \(stackViewModel.reviewBin.count) items from your library. This action cannot be undone.")
+                Text(String(format: String(localized: "bin.alert_message"), stackViewModel.reviewBin.count))
             }
             .fullScreenCover(item: $viewModel.selectedItem) { item in
                 FullScreenMediaView(

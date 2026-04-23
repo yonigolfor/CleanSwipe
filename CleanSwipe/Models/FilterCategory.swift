@@ -8,15 +8,26 @@
 import SwiftUI
 
 enum FilterCategory: String, CaseIterable, Identifiable {
-    case screenshots = "Screenshots"
-    case screenRecordings = "Screen Recordings"
-    case largeVideos = "Large Videos"
-    case blurryPhotos = "Blurry Photos"
-    case burstPhotos = "Burst Photos"
-    case all = "All Photos"
+    case screenshots
+    case screenRecordings
+    case largeVideos
+    case blurryPhotos
+    case all
+    case burstPhotos
+
+    var displayName: String {
+        switch self {
+        case .screenshots: return String(localized: "filter.screenshots")
+        case .screenRecordings: return String(localized: "filter.recordings")
+        case .largeVideos: return String(localized: "filter.large_videos")
+        case .blurryPhotos: return String(localized: "filter.blurry")
+        case .all: return String(localized: "filter.all")
+        case .burstPhotos: return String(localized: "filter.burst")
+        }
+    }
     
-    var id: String { rawValue }
-    
+    var id: String { displayName }
+
     var icon: String {
         switch self {
         case .burstPhotos: return "square.stack.3d.up"
@@ -40,13 +51,13 @@ enum FilterCategory: String, CaseIterable, Identifiable {
     }
     
     var description: String {
-        switch self {
-        case .burstPhotos: return "Series of similar shots"
-        case .screenshots: return "Usually the first to go"
-        case .screenRecordings: return "High-weight items"
-        case .largeVideos: return "Sorted by file size"
-        case .blurryPhotos: return "Low-focus images"
-        case .all: return "Everything in your library"
+            switch self {
+            case .screenshots: return String(localized: "filter.screenshots.desc")
+            case .screenRecordings: return String(localized: "filter.recordings.desc")
+            case .largeVideos: return String(localized: "filter.large_videos.desc")
+            case .blurryPhotos: return String(localized: "filter.blurry.desc")
+            case .all: return String(localized: "filter.all.desc")
+            case .burstPhotos: return String(localized: "filter.burst.desc")
+            }
         }
-    }
 }

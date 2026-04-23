@@ -175,7 +175,7 @@ VStack {
                         HStack(spacing: 6) {
                             Image(systemName: item.isScreenshot ? "camera.viewfinder" : "record.circle")
                                 .font(.caption)
-                            Text(item.isScreenshot ? "Screenshot" : "Recording")
+                            Text(item.isScreenshot ? String(localized: "badge.screenshot") : String(localized: "badge.recording"))
                                 .font(.caption)
                                 .fontWeight(.medium)
                         }

@@ -23,7 +23,7 @@ struct DopamineMeter: View {
                 .animation(.spring(response: 0.3), value: isAnimating)
             
             VStack(alignment: .leading, spacing: 2) {
-                Text("Space Saved")
+                Text(String(localized: "meter.space_saved"))
                     .font(.caption)
                     .foregroundColor(.secondary)
                 

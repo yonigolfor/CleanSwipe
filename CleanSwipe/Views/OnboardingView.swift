@@ -120,11 +120,13 @@ struct OnboardingView: View {
             .padding(.bottom, 20)
 
             VStack(spacing: 16) {
-                Text("הטלפון שלך סוחב\nמשקל מיותר.")
+                Text(String(localized: "onboarding.hook.title"))
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
 
                 Text("בוא נראה כמה אפשר לפנות.")
                     .font(.subheadline)

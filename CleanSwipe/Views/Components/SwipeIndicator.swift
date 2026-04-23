@@ -50,7 +50,7 @@ struct SwipeIndicator: View {
         HStack(spacing: 8) {
             Image(systemName: "trash.fill")
                 .font(.title)
-            Text("Delete")
+            Text(String(localized: "swipe.delete"))
                 .font(.headline)
         }
         .foregroundColor(.white)
@@ -67,7 +67,7 @@ struct SwipeIndicator: View {
         HStack(spacing: 8) {
             Image(systemName: "checkmark.circle.fill")
                 .font(.title)
-            Text("Keep")
+            Text(String(localized: "swipe.keep"))
                 .font(.headline)
         }
         .foregroundColor(.white)
@@ -84,7 +84,7 @@ struct SwipeIndicator: View {
         HStack(spacing: 8) {
             Image(systemName: "star.fill")
                 .font(.title)
-            Text("Star")
+            Text(String(localized: "swipe.later"))
                 .font(.headline)
         }
         .foregroundColor(.white)

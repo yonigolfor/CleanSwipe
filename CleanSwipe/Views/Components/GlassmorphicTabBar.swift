@@ -12,10 +12,10 @@ struct GlassmorphicTabBar: View {
     private let haptic = UIImpactFeedbackGenerator(style: .soft)
 
     private let tabs: [(icon: String, label: String)] = [
-        ("rectangle.stack", "Swipe"),
-        ("line.3.horizontal.decrease.circle", "Filters"),
-        ("trash", "Review")
-    ]
+            ("rectangle.stack", String(localized: "tab.swipe")),
+            ("line.3.horizontal.decrease.circle", String(localized: "tab.filters")),
+            ("trash", String(localized: "tab.review"))
+        ]
 
     var body: some View {
         HStack(spacing: 0) {

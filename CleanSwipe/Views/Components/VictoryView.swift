@@ -26,13 +26,13 @@ struct VictoryView: View {
             .padding(.top, 40)
             
             VStack(spacing: 12) {
-                Text("Gallery Cleaned! 🎉")
+                Text(String(localized: "victory.title"))
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .minimumScaleFactor(0.8)
                     .lineLimit(1)
 
-                Text("You've cleared your stack for now.\nCome back later for more!")
+                Text(String(localized: "victory.subtitle"))
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -43,7 +43,7 @@ struct VictoryView: View {
              // CTA
             if reviewBinCount > 0 {
                 Button(action: onEmptyBin) {
-                    Text("Empty Review Bin (\(reviewBinCount))")
+                    Text(String(format: String(localized: "victory.empty_bin"), reviewBinCount))
                         .font(.headline)
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -57,7 +57,7 @@ struct VictoryView: View {
                 Button(action: onImportPhotos) {
                     HStack(spacing: 8) {
                         Image(systemName: "gear")
-                        Text("Allow More Photos in Settings")
+                        Text(String(localized: "victory.import_photos"))
                             .font(.headline)
                     }
                     .foregroundColor(.blue)
