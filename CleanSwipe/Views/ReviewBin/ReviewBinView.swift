@@ -53,7 +53,7 @@ struct ReviewBinView: View {
                                             Button {
                                                 stackViewModel.restoreFromBin(item)
                                             } label: {
-                                                Label("Restore", systemImage: "arrow.uturn.backward")
+                                                Label(String(localized: "bin.restore"), systemImage: "arrow.uturn.backward")
                                             }
                                         }
                                 }
@@ -201,7 +201,7 @@ struct FullScreenMediaView: View {
                     Button(action: onRestore) {
                         HStack(spacing: 6) {
                             Image(systemName: "arrow.uturn.backward")
-                            Text("Restore")
+                            Text(String(localized: "bin.restore"))
                                 .fontWeight(.semibold)
                         }
                         .foregroundColor(.white)

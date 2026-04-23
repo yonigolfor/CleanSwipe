@@ -81,8 +81,8 @@ extension EmptyStateView {
     
     static var emptyBin: EmptyStateView {
         EmptyStateView(
-            title: "Review Bin is Empty",
-            message: "Photos you swipe left will appear here before permanent deletion.",
+            title: String(localized: "bin.empty_title"),
+            message: String(localized: "bin.empty_message"),
             icon: "trash"
         )
     }

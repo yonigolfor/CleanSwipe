@@ -116,6 +116,9 @@
         }
       }
     },
+    "bin.empty_message" : {
+
+    },
     "bin.empty_state" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -132,6 +135,9 @@
           }
         }
       }
+    },
+    "bin.empty_title" : {
+
     },
     "bin.empty_trash" : {
       "extractionState" : "manual",
@@ -645,7 +651,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "הטלפון שלך סוחב\\nמשקל מיותר"
+            "value" : "הטלפון שלך סוחב\nמשקל מיותר"
           }
         }
       }
@@ -933,6 +939,7 @@
       }
     },
     "Restore" : {
+      "extractionState" : "stale",
       "localizations" : {
         "he" : {
           "stringUnit" : {

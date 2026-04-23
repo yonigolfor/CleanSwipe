@@ -39,7 +39,8 @@ struct SwipeStackView: View {
                 // so the cards don't slide underneath it (≈ 90pt incl. padding).
                 Color.clear.frame(height: 90)
 
-                // Card Stack
+                // Card Stack — force LTR so swipe physics are always consistent:
+                // right = Keep, left = Delete, regardless of device language.
                 GeometryReader { geometry in
                     ZStack {
                         let _ = print("🔄 ZStack rerender, stack count: \(viewModel.photoStack.count)")
@@ -85,6 +86,7 @@ struct SwipeStackView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .padding(.vertical, 10)
+                .environment(\.layoutDirection, .leftToRight)
 
                 // Instructions bar
 //                if !viewModel.photoStack.isEmpty {
@@ -136,17 +138,20 @@ struct SwipeStackView: View {
     
     // MARK: - Swipe Gesture
     
+    // In RTL layout iOS flips the translation.width sign.
+    // We normalize it here so swipe-right always means Keep
+    // and swipe-left always means Delete regardless of locale.
     private var dragGesture: some Gesture {
         DragGesture()
             .onChanged { value in
                 dragOffset = value.translation
-                
-                // Calculate rotation based on horizontal drag
                 dragRotation = Double(value.translation.width / 20)
             }
             .onEnded { value in
+                // SwipeDirection uses the RAW translation (not flipped)
+                // because .left/.right are already correct in RTL context.
                 let direction = SwipeDirection.from(offset: value.translation)
-                
+
                 if let action = direction.action {
                     // Animate card off screen
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {

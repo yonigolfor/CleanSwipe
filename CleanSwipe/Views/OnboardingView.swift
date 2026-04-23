@@ -356,11 +356,13 @@ struct OnboardingView: View {
                         .gesture(
                             DragGesture()
                                 .onChanged { value in
-                                    demoOffset = value.translation
-                                    demoRotation = Double(value.translation.width / 20)
+                                    let isRTL = UIApplication.shared.userInterfaceLayoutDirection == .rightToLeft
+                                    let normalizedX = value.translation.width * (isRTL ? -1 : 1)
+                                    demoOffset = CGSize(width: normalizedX, height: value.translation.height)
+                                    demoRotation = Double(normalizedX / 20)
                                     withAnimation(.spring(response: 0.2)) {
-                                        demoLabel = value.translation.width < -30 ? "מחק" :
-                                                    value.translation.width > 30 ? "שמור" : nil
+                                        demoLabel = normalizedX < -30 ? String(localized: "swipe.delete") :
+                                                    normalizedX > 30 ? String(localized: "swipe.keep") : nil
                                     }
                                     softHaptic.impactOccurred()
                                 }

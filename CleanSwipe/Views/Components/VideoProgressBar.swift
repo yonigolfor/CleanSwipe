@@ -35,6 +35,7 @@ struct VideoProgressBar: View {
                 }
                 .animation(.easeInOut(duration: 0.15), value: isDragging)
                 .contentShape(Rectangle())
+                .environment(\.layoutDirection, .leftToRight)
                 .highPriorityGesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { value in
@@ -42,7 +43,7 @@ struct VideoProgressBar: View {
                             isDragging = true
                             coordinator.stopObserving()
                             let newProgress = min(max(value.location.x / geo.size.width, 0), 1)
-                            progress = newProgress
+                 progress = newProgress
                             haptic.selectionChanged()
                             let seekTime = CMTime(
                                 seconds: newProgress * duration,
