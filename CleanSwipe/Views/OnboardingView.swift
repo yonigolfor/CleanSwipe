@@ -128,7 +128,7 @@ struct OnboardingView: View {
                     .lineLimit(2)
                     .minimumScaleFactor(0.7)
 
-                Text("בוא נראה כמה אפשר לפנות.")
+                Text(String(localized: "onboarding.hook.subtitle"))
                     .font(.subheadline)
                     .foregroundColor(.gray)
             }
@@ -143,7 +143,7 @@ struct OnboardingView: View {
                     currentStep = 3 // Jump directly to Permission screen
                 }
             } label: {
-                Text("גלה כמה אפשר לפנות")
+                Text(String(localized: "onboarding.hook.cta"))
                     .font(.headline)
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
@@ -180,7 +180,7 @@ struct OnboardingView: View {
                     Image(systemName: "magnifyingglass.circle.fill")
                         .font(.title2)
                         .foregroundColor(.blue)
-                    Text("סורק את הגלריה...")
+                    Text(String(localized: "onboarding.scan.title"))
                         .font(.headline)
                         .foregroundColor(.white)
                     Spacer()
@@ -197,21 +197,21 @@ struct OnboardingView: View {
                 VStack(spacing: 16) {
                     scanRow(
                         icon: "photo.fill",
-                        label: "תמונות",
+                        label: String(localized: "onboarding.scan.photos"),
                         value: photoCount,
                         isScanning: photoCount == 0 && !scanComplete,
                         color: .blue
                     )
                     scanRow(
                         icon: "video.fill",
-                        label: "סרטונים",
+                        label: String(localized: "onboarding.scan.videos"),
                         value: videoCount,
                         isScanning: videoCount == 0 && !scanComplete,
                         color: .purple
                     )
                     scanRow(
                         icon: "film.fill",
-                        label: "סרטונים כבדים (50MB+)",
+                        label: String(localized: "onboarding.scan.large_videos"),
                         value: largeVideoCount,
                         isScanning: largeVideoCount == 0 && !scanComplete,
                         color: .orange
@@ -235,7 +235,7 @@ struct OnboardingView: View {
                 Image(systemName: "lock.shield.fill")
                     .foregroundColor(.green)
                     .font(.caption)
-                Text("הכל נשאר על המכשיר שלך בלבד")
+                Text(String(localized: "onboarding.scan.privacy"))
                     .font(.caption)
                     .foregroundColor(.gray)
             }
@@ -251,7 +251,7 @@ struct OnboardingView: View {
                             currentStep = 4
                         }
                     } label: {
-                        Text("הבנתי, בוא נמשיך")
+                        Text(String(localized: "onboarding.scan.cta"))
                             .font(.headline)
                             .foregroundColor(.black)
                             .frame(maxWidth: .infinity)
@@ -277,7 +277,7 @@ struct OnboardingView: View {
                             currentStep = 4
                         }
                     } label: {
-                        Text("דלג")
+                        Text(String(localized: "onboarding.scan.skip"))
                             .font(.subheadline)
                             .foregroundColor(.gray)
                             .padding(.vertical, 12)
@@ -297,10 +297,10 @@ struct OnboardingView: View {
             Spacer()
 
             VStack(spacing: 12) {
-                Text("ניקוי בסטייל.")
+                Text(String(localized: "onboarding.demo.title"))
                     .font(.system(size: 32, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-                Text("שמאלה לזבל, ימינה למזכרות.")
+                Text(String(localized: "onboarding.demo.subtitle"))
                     .font(.subheadline)
                     .foregroundColor(.gray)
             }
@@ -330,7 +330,7 @@ struct OnboardingView: View {
                                 Image(systemName: "photo.fill")
                                     .font(.system(size: 50))
                                     .foregroundColor(.white.opacity(0.3))
-                                Text("נסה להחליק!")
+                                Text(String(localized: "onboarding.demo.hint"))
                                     .font(.headline)
                                     .foregroundColor(.white.opacity(0.7))
                             }
@@ -401,7 +401,7 @@ struct OnboardingView: View {
             }
             .frame(height: 320)
 
-            Text("נסה לגרור את הכרטיס")
+            Text(String(localized: "onboarding.demo.hint"))
                 .font(.caption)
                 .foregroundColor(.gray)
 
@@ -413,7 +413,7 @@ struct OnboardingView: View {
                     currentStep = 1
                 }
             } label: {
-                Text("הבנתי!")
+                Text(String(localized: "onboarding.demo.cta"))
                     .font(.headline)
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
@@ -456,12 +456,12 @@ struct OnboardingView: View {
             }
 
             VStack(spacing: 16) {
-                Text("כדי שנוכל לעשות את הקסם")
+                Text(String(localized: "onboarding.permission.title"))
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
-
-                Text("אנחנו צריכים גישה לגלריה שלך.\nהכל נשאר על המכשיר בלבד 🔒")
+                
+                Text(String(localized: "onboarding.permission.subtitle"))
                     .font(.body)
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
@@ -471,9 +471,9 @@ struct OnboardingView: View {
 
             // Privacy bullets
             VStack(alignment: .leading, spacing: 14) {
-                privacyRow(icon: "iphone", text: "עיבוד מקומי בלבד — אין שרתים")
-                privacyRow(icon: "eye.slash.fill", text: "לא רואים את התמונות שלך")
-                privacyRow(icon: "trash.slash.fill", text: "אתה מחליט מה נמחק")
+                privacyRow(icon: "iphone", text: String(localized: "onboarding.permission.local"))
+                privacyRow(icon: "eye.slash.fill", text: String(localized: "onboarding.permission.private"))
+                privacyRow(icon: "trash.slash.fill", text: String(localized: "onboarding.permission.control"))
             }
             .padding(.horizontal, 40)
 
@@ -483,7 +483,7 @@ struct OnboardingView: View {
                 haptic.impactOccurred()
                 requestPermission()
             } label: {
-                Text("אשר גישה לגלריה")
+                Text(String(localized: "onboarding.permission.cta"))
                     .font(.headline)
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)
@@ -526,11 +526,11 @@ struct OnboardingView: View {
             }
 
             VStack(spacing: 16) {
-                Text("הכל מוכן! 🚀")
+                Text(String(localized: "onboarding.quickwin.title"))
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
-
-                Text("בוא נתחיל לפנות מקום.")
+                
+                Text(String(localized: "onboarding.quickwin.subtitle"))
                     .font(.body)
                     .foregroundColor(.gray)
             }
@@ -541,7 +541,7 @@ struct OnboardingView: View {
                 haptic.impactOccurred()
                 onComplete()
             } label: {
-                Text("בוא נתחיל בסוויפ 🃏")
+                Text(String(localized: "onboarding.quickwin.cta"))
                     .font(.headline)
                     .foregroundColor(.black)
                     .frame(maxWidth: .infinity)

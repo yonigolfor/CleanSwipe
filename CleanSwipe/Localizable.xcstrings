@@ -11,7 +11,14 @@
 
     },
     "Awesome! 💪" : {
-
+      "localizations" : {
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "עבודה טובה! 💪"
+          }
+        }
+      }
     },
     "badge.recording" : {
       "extractionState" : "manual",
@@ -117,7 +124,20 @@
       }
     },
     "bin.empty_message" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos you swipe left will appear here before permanent deletion."
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "תמונות שתחליק שמאלה יופיעו כאן לפני מחיקה סופית."
+          }
+        }
+      }
     },
     "bin.empty_state" : {
       "extractionState" : "manual",
@@ -137,7 +157,20 @@
       }
     },
     "bin.empty_title" : {
-
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Review Bin is Empty"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "סל המחזור ריק"
+          }
+        }
+      }
     },
     "bin.empty_trash" : {
       "extractionState" : "manual",
@@ -214,6 +247,12 @@
           "stringUnit" : {
             "state" : "new",
             "value" : "by deleting %1$lld item%2$@"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "נמחקו %1$lld פריטים"
           }
         }
       }
@@ -1119,7 +1158,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "סיימת את הערימה שלך.\\nחזור מאוחר יותר לעוד!"
+            "value" : "סיימת את הערימה שלך. חזור מאוחר יותר לעוד!"
           }
         }
       }
@@ -1151,57 +1190,6 @@
           }
         }
       }
-    },
-    "אנחנו צריכים גישה לגלריה שלך.\nהכל נשאר על המכשיר בלבד 🔒" : {
-
-    },
-    "אשר גישה לגלריה" : {
-
-    },
-    "בוא נראה כמה אפשר לפנות." : {
-
-    },
-    "בוא נתחיל בסוויפ 🃏" : {
-
-    },
-    "בוא נתחיל לפנות מקום." : {
-
-    },
-    "גלה כמה אפשר לפנות" : {
-
-    },
-    "דלג" : {
-
-    },
-    "הבנתי, בוא נמשיך" : {
-
-    },
-    "הבנתי!" : {
-
-    },
-    "הכל מוכן! 🚀" : {
-
-    },
-    "הכל נשאר על המכשיר שלך בלבד" : {
-
-    },
-    "כדי שנוכל לעשות את הקסם" : {
-
-    },
-    "ניקוי בסטייל." : {
-
-    },
-    "נסה לגרור את הכרטיס" : {
-
-    },
-    "נסה להחליק!" : {
-
-    },
-    "סורק את הגלריה..." : {
-
-    },
-    "שמאלה לזבל, ימינה למזכרות." : {
-
     }
   },
   "version" : "1.0"
