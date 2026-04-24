@@ -492,6 +492,23 @@
         }
       }
     },
+    "filters.empty" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Empty"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ריק"
+          }
+        }
+      }
+    },
     "filters.section_footer" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -556,6 +573,23 @@
     },
     "Key" : {
       "extractionState" : "manual"
+    },
+    "loading.scanning" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "סורק…"
+          }
+        }
+      }
     },
     "meter.space_saved" : {
       "comment" : "MARK: - Dopamine Meter",
@@ -1097,7 +1131,7 @@
         "he" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "סוויפ"
+            "value" : "Swipe"
           }
         }
       }

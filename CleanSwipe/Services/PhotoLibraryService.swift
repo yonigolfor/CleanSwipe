@@ -173,8 +173,13 @@ class PhotoLibraryService: ObservableObject {
             case .screenRecordings:
                 if asset.isScreenRecording { count += 1 }
             case .largeVideos:
-                let item = PhotoItem(asset: asset)
-                if item.isVideo && item.fileSize > 50_000_000 { count += 1 }
+                if asset.mediaType == .video {
+                    let resources = PHAssetResource.assetResources(for: asset)
+                    let size = resources.first.flatMap {
+                        $0.value(forKey: "fileSize") as? Int64
+                    } ?? 0
+                    if size > 50_000_000 { count += 1 }
+                }
             case .burstPhotos:
                 count += 1
             case .blurryPhotos:

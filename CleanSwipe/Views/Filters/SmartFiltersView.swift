@@ -39,9 +39,12 @@ struct SmartFiltersView: View {
     // MARK: - Filter Row
     
     private func filterRow(for category: FilterCategory) -> some View {
-        Button {
+        let count = categoryCounts[category] ?? 0
+        let isEmpty = categoryCounts[category] != nil && count == 0
+
+        return Button {
+            guard !isEmpty else { return }
             stackViewModel.loadPhotos(filter: category)
-            // Navigate to the Swipe tab
             selectedTab = 0
         } label: {
             HStack(spacing: 16) {
@@ -70,25 +73,34 @@ struct SmartFiltersView: View {
                 Spacer()
                 
                 // Count badge
-                if let count = categoryCounts[category], count > 0 {
-                    Text("\(count)")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule()
-                                .fill(category.color)
-                        )
+                if let count = categoryCounts[category] {
+                    if count > 0 {
+                        Text("\(count)")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Capsule().fill(category.color))
+                    } else {
+                        Text(String(localized: "filters.empty"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    ProgressView()
+                        .scaleEffect(0.7)
                 }
-                
-                // Chevron
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+
+                // Chevron — hidden when empty
+                if count > 0 {
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .padding(.vertical, 8)
+            .opacity(isEmpty ? 0.4 : 1.0)
         }
     }
     

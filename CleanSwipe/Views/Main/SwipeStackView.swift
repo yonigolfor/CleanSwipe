@@ -45,7 +45,15 @@ struct SwipeStackView: View {
                     ZStack {
                         let _ = print("🔄 ZStack rerender, stack count: \(viewModel.photoStack.count)")
 
-                        if viewModel.photoStack.isEmpty {
+                        if viewModel.isLoading {
+                            VStack(spacing: 16) {
+                                ProgressView()
+                                    .scaleEffect(1.5)
+                                Text(String(localized: "loading.scanning"))
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                        } else if viewModel.photoStack.isEmpty {
                             VictoryView(
                                 onEmptyBin: { selectedTab = 2 },
                                 onImportPhotos: PHPhotoLibrary.authorizationStatus(for: .readWrite) == .limited ? {
