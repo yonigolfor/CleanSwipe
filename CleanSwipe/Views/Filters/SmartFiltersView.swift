@@ -10,7 +10,7 @@ import SwiftUI
 struct SmartFiltersView: View {
     @EnvironmentObject var stackViewModel: PhotoStackViewModel
     @Binding var selectedTab: Int
-    @State private var categoryCounts: [FilterCategory: Int] = [:]
+
     
     var body: some View {
         NavigationView {
@@ -28,10 +28,12 @@ struct SmartFiltersView: View {
             .navigationTitle(String(localized: "filters.title"))
             .navigationBarTitleDisplayMode(.large)
             .onAppear {
-                loadCounts()
+                if stackViewModel.categoryCounts.isEmpty {
+                    stackViewModel.refreshCategoryCounts()
+                }
             }
             .refreshable {
-                loadCounts()
+                stackViewModel.refreshCategoryCounts()
             }
         }
     }
@@ -39,8 +41,8 @@ struct SmartFiltersView: View {
     // MARK: - Filter Row
     
     private func filterRow(for category: FilterCategory) -> some View {
-        let count = categoryCounts[category] ?? 0
-        let isEmpty = categoryCounts[category] != nil && count == 0
+        let count = stackViewModel.categoryCounts[category] ?? 0
+        let isEmpty = stackViewModel.categoryCounts[category] != nil && count == 0
 
         return Button {
             guard !isEmpty else { return }
@@ -73,7 +75,25 @@ struct SmartFiltersView: View {
                 Spacer()
                 
                 // Count badge
-                if let count = categoryCounts[category] {
+                // For largeVideos: show shimmer during Phase 2 scan,
+                // then animate to the accurate count when ready.
+                if category == .largeVideos && stackViewModel.isCountingLargeVideos {
+                    // Large videos: shimmer while Phase 2 accurate scan runs
+                    ShimmerView()
+                } else if category == .blurryPhotos || category == .burstPhotos {
+                    // These categories require deep analysis — never show a
+                    // potentially misleading count. Show a scan indicator instead.
+                    HStack(spacing: 4) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.caption2)
+                        Text(String(localized: "filters.requires_scan"))
+                            .font(.caption)
+                    }
+                    .foregroundColor(category.color.opacity(0.8))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(category.color.opacity(0.15)))
+                } else if let count = stackViewModel.categoryCounts[category] {
                     if count > 0 {
                         Text("\(count)")
                             .font(.subheadline)
@@ -82,6 +102,7 @@ struct SmartFiltersView: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(Capsule().fill(category.color))
+                            .contentTransition(.numericText())
                     } else {
                         Text(String(localized: "filters.empty"))
                             .font(.caption)
@@ -93,30 +114,48 @@ struct SmartFiltersView: View {
                 }
 
                 // Chevron — hidden when empty
-                if count > 0 {
+                if (stackViewModel.categoryCounts[category] ?? 0) > 0 {
                     Image(systemName: "chevron.right")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
             .padding(.vertical, 8)
-            .opacity(isEmpty ? 0.4 : 1.0)
+            .opacity((stackViewModel.categoryCounts[category] == 0 && stackViewModel.categoryCounts[category] != nil) ? 0.4 : 1.0)
         }
     }
     
-    // MARK: - Data Loading
-    
-    private func loadCounts() {
-        Task.detached(priority: .userInitiated) {
-            let service = PhotoLibraryService.shared
-            let processed = await MainActor.run { stackViewModel.processedAssetIDs }
-            let counts: [FilterCategory: Int] = Dictionary(
-                uniqueKeysWithValues: FilterCategory.allCases.map { ($0, service.count(for: $0, excluding: processed)) }
-            )
-            await MainActor.run {
-                categoryCounts = counts
-            }
+
+}
+
+/// A horizontal shimmer animation used as a placeholder while
+/// expensive counts are being calculated in the background.
+struct ShimmerView: View {
+    @State private var phase: CGFloat = -1
+
+    var body: some View {
+        GeometryReader { geo in
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.secondary.opacity(0.2),
+                            Color.secondary.opacity(0.5),
+                            Color.secondary.opacity(0.2)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .offset(x: geo.size.width * phase)
+                .animation(
+                    .linear(duration: 1.2).repeatForever(autoreverses: false),
+                    value: phase
+                )
+                .onAppear { phase = 1 }
         }
+        .frame(width: 48, height: 16)
+        .clipShape(Capsule())
     }
 }
 

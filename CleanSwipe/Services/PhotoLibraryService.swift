@@ -151,6 +151,70 @@ class PhotoLibraryService: ObservableObject {
 
     // MARK: - Count (fast path)
 
+    /// Phase 1 — instant counts using only PHAsset metadata (no resource scan).
+    /// Returns results in milliseconds since it never touches file resources.
+    /// Used to show immediate numbers in SmartFiltersView before the accurate
+    /// Phase 2 background scan completes.
+    func countFast(for category: FilterCategory, excluding processedIDs: Set<String> = []) -> Int {
+        guard let fetchResult else { return 0 }
+
+        switch category {
+        case .all:
+            return max(0, fetchResult.count - processedIDs.count)
+
+        case .screenshots:
+            let options = PHFetchOptions()
+            options.predicate = NSPredicate(
+                format: "mediaSubtype & %d != 0",
+                PHAssetMediaSubtype.photoScreenshot.rawValue
+            )
+            let result = PHAsset.fetchAssets(with: options)
+            return max(0, result.count - processedIDs.count)
+
+        case .screenRecordings:
+                // PHAsset.isScreenRecording checks mediaSubtype internally.
+                // We enumerate only videos to keep it fast.
+                let options = PHFetchOptions()
+                options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
+                let result = PHAsset.fetchAssets(with: options)
+                var count = 0
+                result.enumerateObjects { asset, _, _ in
+                    if asset.isScreenRecording && !processedIDs.contains(asset.localIdentifier) {
+                        count += 1
+                    }
+                }
+                return count
+
+        case .largeVideos:
+            // Fast approximation: return total video count.
+            // Phase 2 will update this with the accurate filtered count.
+            let options = PHFetchOptions()
+            options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
+            let result = PHAsset.fetchAssets(with: options)
+            return max(0, result.count - processedIDs.count)
+
+        case .burstPhotos:
+            // Match the same logic as fetchPageOfAssets which returns ALL assets
+            // and lets BurstAnalyzer group them. So count is an approximation.
+            // We show total image count as upper bound.
+            let options = PHFetchOptions()
+            options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+            let result = PHAsset.fetchAssets(with: options)
+            return max(0, result.count - processedIDs.count)
+
+        case .blurryPhotos:
+            // Match fetchPageOfAssets which filters: image type AND not screenshot
+            let options = PHFetchOptions()
+            options.predicate = NSPredicate(
+                format: "mediaType == %d AND NOT (mediaSubtype & %d != 0)",
+                PHAssetMediaType.image.rawValue,
+                PHAssetMediaSubtype.photoScreenshot.rawValue
+            )
+            let result = PHAsset.fetchAssets(with: options)
+            return max(0, result.count - processedIDs.count)
+        }
+    }
+
     /// Approximate count of assets for a category, excluding processed IDs.
     /// For `.all`, this is O(1). Other categories still enumerate but benefit
     /// from the in-memory PHFetchResult cache.

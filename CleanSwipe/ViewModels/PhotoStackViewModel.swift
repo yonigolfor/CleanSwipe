@@ -18,6 +18,20 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     @Published var currentFilter: FilterCategory = .all
     @Published var totalSpaceSaved: Int64 = 0
     @Published var isLoading = false
+    @Published var categoryCounts: [FilterCategory: Int] = [:]
+    /// True while the expensive Phase 2 large video scan is running.
+    @Published var isCountingLargeVideos = false
+
+    /// In-memory cache for the expensive large video count.
+    /// Persisted to Documents/largeVideoCount.json between app launches.
+    private var cachedLargeVideoCount: Int? = nil
+
+    /// Path to the small JSON cache file for large video count.
+    private var cacheFileURL: URL {
+        FileManager.default
+            .urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("largeVideoCount.json")
+    }
 
     // MARK: - Private State
 
@@ -84,12 +98,90 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         loadPhotos()
         restoreBinFromDisk()
         PHPhotoLibrary.shared().register(self)
+        // Load cached large video count BEFORE refreshing so user sees
+        // the previous result immediately instead of shimmer on every launch.
+        loadCachedLargeVideoCount()
+        refreshCategoryCounts()
+    }
+
+    /// Loads the cached large video count from disk if available.
+    /// Called once at init so the count is available immediately.
+    private func loadCachedLargeVideoCount() {
+        guard let data = try? Data(contentsOf: cacheFileURL),
+              let count = try? JSONDecoder().decode(Int.self, from: data) else { return }
+        cachedLargeVideoCount = count
+        categoryCounts[.largeVideos] = count
+    }
+
+    /// Saves the accurate large video count to disk for next launch.
+    private func saveLargeVideoCountToCache(_ count: Int) {
+        cachedLargeVideoCount = count
+        if let data = try? JSONEncoder().encode(count) {
+            try? data.write(to: cacheFileURL, options: .atomic)
+        }
+    }
+
+    func refreshCategoryCounts() {
+        Task.detached(priority: .userInitiated) {
+            let service = PhotoLibraryService.shared
+
+            // Ensure fetchResult is populated
+            if service.fetchResult == nil {
+                service.fetchAllPhotos()
+            }
+
+            let processed = await self.processedAssetIDs
+
+            // ── Phase 1: Instant estimates (milliseconds) ─────────────────
+            // Builds fast counts for all categories except largeVideos.
+            // largeVideos uses cached value from previous run if available.
+            var fastCounts: [FilterCategory: Int] = Dictionary(
+                uniqueKeysWithValues: FilterCategory.allCases.map {
+                    ($0, service.countFast(for: $0, excluding: processed))
+                }
+            )
+
+            // If we have a cached large video count, use it immediately.
+            // This means the user NEVER sees shimmer on repeat launches.
+            let cached = await self.cachedLargeVideoCount
+            if let cached {
+                fastCounts[.largeVideos] = cached
+            }
+
+            await MainActor.run {
+                withAnimation { self.categoryCounts = fastCounts }
+                // Only show shimmer if we have NO cached value yet
+                self.isCountingLargeVideos = cached == nil
+            }
+
+            // ── Phase 2: Accurate large video count in background ─────────
+            // Always runs to verify/update the cache, but only shows
+            // shimmer when there is no cached value (first ever launch).
+            let accurateLargeVideoCount = await Task.detached(priority: .utility) {
+                service.count(for: .largeVideos, excluding: processed)
+            }.value
+
+            // Save to cache so next launch is instant
+            await self.saveLargeVideoCountToCache(accurateLargeVideoCount)
+
+            await MainActor.run {
+                withAnimation(.spring(response: 0.4)) {
+                    self.categoryCounts[.largeVideos] = accurateLargeVideoCount
+                    self.isCountingLargeVideos = false
+                }
+            }
+        }
     }
 
     // MARK: - PHPhotoLibraryChangeObserver
 
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
         Task { @MainActor in
+            // Library changed — invalidate large video cache so Phase 2
+            // runs fresh and the user sees accurate counts.
+            self.cachedLargeVideoCount = nil
+            try? FileManager.default.removeItem(at: self.cacheFileURL)
+
             guard let oldResult = self.photoService.fetchResult else {
                 // No prior fetch — do a full initial load.
                 self.photoService.fetchAllPhotos()
@@ -196,10 +288,19 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
                         for: Array(items.prefix(10)),
                         targetSize: CGSize(width: 400, height: 600)
                     )
-                    // Pre-load video players for the first upcoming video assets.
                     let firstAssets = Array(items.prefix(5)).map { $0.asset }
                     Task { await VideoPlayerPool.shared.warmUp(for: firstAssets) }
                 }
+
+                if self.categoryCounts.isEmpty {
+                    self.refreshCategoryCounts()
+                }
+            }
+
+            // After initial load, keep scanning until buffer is full.
+            // This runs in background while user swipes on the first results.
+            if filter == .blurryPhotos || filter == .burstPhotos {
+                await scanUntilFull(filter: filter)
             }
         }
     }
@@ -210,9 +311,14 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     private func loadNextPageIfNeeded() {
         guard !isFetchingNextPage,
               photoStack.count <= lowWatermark,
-              fetchCursor < photoService.totalAssetCount,
-              currentFilter != .burstPhotos,
-              currentFilter != .blurryPhotos else { return }
+              fetchCursor < photoService.totalAssetCount else { return }
+
+        // For analysis-heavy filters, use the refill mechanism
+        // which scans continuously until the buffer is full.
+        if currentFilter == .blurryPhotos || currentFilter == .burstPhotos {
+            Task { await scanUntilFull(filter: currentFilter) }
+            return
+        }
 
         isFetchingNextPage = true
 
@@ -377,6 +483,8 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
 
     // MARK: - Private Helpers
 
+    /// Scans items for blur and returns only blurry ones.
+    /// Processes images concurrently for maximum speed.
     private func filterBlurry(_ items: [PhotoItem]) async -> [PhotoItem] {
         await withCheckedContinuation { continuation in
             Task.detached(priority: .userInitiated) {
@@ -405,6 +513,56 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
                     continuation.resume(returning: result)
                 }
             }
+        }
+    }
+
+    /// Continuously scans the library until it finds at least `targetCount`
+    /// items matching the filter, or exhausts the entire library.
+    /// This powers the "refill mechanism" — the user never sees an empty
+    /// stack while there are still unscanned assets in the library.
+    private func scanUntilFull(
+        filter: FilterCategory,
+        targetCount: Int = 15,
+        batchSize: Int = 200
+    ) async {
+        guard filter == .blurryPhotos || filter == .burstPhotos else { return }
+
+        while photoStack.count < targetCount,
+              fetchCursor < photoService.totalAssetCount,
+              !isFetchingNextPage {
+
+            isFetchingNextPage = true
+
+            let (rawItems, nextIdx) = photoService.fetchPageOfAssets(
+                for: filter,
+                startIndex: fetchCursor,
+                pageSize: batchSize,
+                excluding: processedAssetIDs
+            )
+
+            var items = rawItems
+            if filter == .burstPhotos {
+                items = await BurstAnalyzer.shared.analyze(items)
+            } else if filter == .blurryPhotos {
+                items = await filterBlurry(items)
+            }
+
+            let newCursor = nextIdx ?? photoService.totalAssetCount
+
+            await MainActor.run {
+                if !items.isEmpty {
+                    self.photoStack.append(contentsOf: items)
+                    self.photoService.startCaching(
+                        for: items,
+                        targetSize: CGSize(width: 400, height: 600)
+                    )
+                }
+                self.fetchCursor = newCursor
+                self.isFetchingNextPage = false
+            }
+
+            // If no assets left to scan, stop
+            if nextIdx == nil { break }
         }
     }
 

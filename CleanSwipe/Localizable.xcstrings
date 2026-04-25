@@ -509,6 +509,22 @@
         }
       }
     },
+    "filters.requires_scan" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tap to scan"
+          }
+        },
+        "he" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "לחץ לסריקה"
+          }
+        }
+      }
+    },
     "filters.section_footer" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -572,6 +588,9 @@
       }
     },
     "Key" : {
+      "extractionState" : "manual"
+    },
+    "Key 1" : {
       "extractionState" : "manual"
     },
     "loading.scanning" : {
