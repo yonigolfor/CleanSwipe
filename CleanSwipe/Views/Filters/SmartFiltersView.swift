@@ -86,18 +86,31 @@ struct SmartFiltersView: View {
                     (category == .largeVideos && stackViewModel.isCountingLargeVideos)
 
                 if isLoadingCount {
+                    // First-ever launch: no cache yet — show shimmer
                     ShimmerView()
                 } else if let count = stackViewModel.categoryCounts[category] {
                     if count > 0 {
-                        // All Photos shows exact count. Other categories cap at 99+.
-                        Text(count >= 100 && category != .all ? "99+" : "\(count)")
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Capsule().fill(category.color))
-                            .contentTransition(.numericText())
+                        let displayText = count >= 100 && category != .all ? "99+" : "\(count)"
+                        // Ghost state for largeVideos while incremental scan runs:
+                        // show cached number slightly dimmed + small spinner.
+                        // When incremental scan finishes, number rolls to new value.
+                        HStack(spacing: 4) {
+                            Text(displayText)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .contentTransition(.numericText(countsDown: count < (stackViewModel.categoryCounts[category] ?? 0)))
+                                .opacity(category == .largeVideos && stackViewModel.isCountingLargeVideos ? 0.5 : 1.0)
+
+                            if category == .largeVideos && stackViewModel.isCountingLargeVideos {
+                                ProgressView()
+                                    .scaleEffect(0.5)
+                                    .tint(.white)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(category.color))
                     } else {
                         Text(String(localized: "filters.empty"))
                             .font(.caption)

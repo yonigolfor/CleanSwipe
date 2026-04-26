@@ -11,15 +11,26 @@ import Photos
 struct ContentView: View {
     @StateObject private var stackViewModel = PhotoStackViewModel()
     @StateObject private var photoService = PhotoLibraryService.shared
+    @EnvironmentObject var deepLinkRouter: DeepLinkRouter
     
     @State private var selectedTab = 0
     
     var body: some View {
-        mainTabView
-            .onAppear {
-                checkPhotoLibraryAuthorization()
-            }
-    }
+            mainTabView
+                .onAppear {
+                    checkPhotoLibraryAuthorization()
+                }
+                .onChange(of: deepLinkRouter.selectedTab) { _, newTab in
+                    selectedTab = newTab
+                }
+                .alert("הישג חדש!", isPresented: $deepLinkRouter.shouldShowMilestoneAlert) {
+                    Button("מעולה! 🎉") {
+                        deepLinkRouter.shouldShowMilestoneAlert = false
+                    }
+                } message: {
+                    Text(deepLinkRouter.milestoneMessage)
+                }
+        }
     
     // MARK: - Main Tab View
     
@@ -62,8 +73,13 @@ struct ContentView: View {
     }
 
     private func checkPhotoLibraryAuthorization() {
-        photoService.checkAuthorization()
-    }
+            photoService.checkAuthorization()
+            
+            // Evaluate notifications after photo library is ready
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                NotificationScheduler.shared.evaluateAndScheduleNotifications()
+            }
+        }
 }
 
 #Preview {

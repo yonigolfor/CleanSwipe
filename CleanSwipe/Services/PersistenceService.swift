@@ -7,6 +7,13 @@ class PersistenceService {
     @AppStorage("keptPhotoIDs") private var keptIDsData: Data = Data()
     @AppStorage("totalSpaceSavedLifetime") private var _totalSpaceSavedLifetime: Double = 0
     @AppStorage("reviewBinIDs") private var reviewBinIDsData: Data = Data()
+    @AppStorage("largeVideoCount") var cachedLargeVideoCount: Int = -1
+    @AppStorage("largeVideoSyncDate") private var _largeVideoSyncDate: Double = 0
+
+    var largeVideoSyncDate: Date? {
+        get { _largeVideoSyncDate == 0 ? nil : Date(timeIntervalSince1970: _largeVideoSyncDate) }
+        set { _largeVideoSyncDate = newValue?.timeIntervalSince1970 ?? 0 }
+    }
     @AppStorage("reviewBinSpaceSaved") private var _reviewBinSpaceSaved: Double = 0
 
     var reviewBinSpaceSaved: Int64 {

@@ -9,6 +9,31 @@ import SwiftUI
 import Photos
 import Combine
 
+// Extension to save processed assets for notifications
+extension PhotoStackViewModel {
+    private func saveProcessedAsset(assetId: String, action: MediaAction) {
+        var processed = getProcessedAssets()
+        let record = ProcessedAsset(
+            assetId: assetId,
+            action: action,
+            timestamp: Date()
+        )
+        processed.append(record)
+        
+        if let encoded = try? JSONEncoder().encode(processed) {
+            UserDefaults.standard.set(encoded, forKey: "processedAssets")
+        }
+    }
+    
+    private func getProcessedAssets() -> [ProcessedAsset] {
+        guard let data = UserDefaults.standard.data(forKey: "processedAssets"),
+              let decoded = try? JSONDecoder().decode([ProcessedAsset].self, from: data) else {
+            return []
+        }
+        return decoded
+    }
+}
+
 @MainActor
 class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLibraryChangeObserver {
     // MARK: - Published Properties
@@ -22,16 +47,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     /// True while the expensive Phase 2 large video scan is running.
     @Published var isCountingLargeVideos = false
 
-    /// In-memory cache for the expensive large video count.
-    /// Persisted to Documents/largeVideoCount.json between app launches.
-    private var cachedLargeVideoCount: Int? = nil
 
-    /// Path to the small JSON cache file for large video count.
-    private var cacheFileURL: URL {
-        FileManager.default
-            .urls(for: .documentDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("largeVideoCount.json")
-    }
 
     // MARK: - Private State
 
@@ -105,26 +121,24 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
         // It is triggered lazily by SmartFiltersView.onAppear via .task.
     }
 
-    /// Loads the cached large video count from disk if available.
-    /// Called once at init so the count is available immediately.
+    /// Loads the cached large video count from PersistenceService.
+    /// Shows instantly on launch — no scanning needed.
     private func loadCachedLargeVideoCount() {
-        guard let data = try? Data(contentsOf: cacheFileURL),
-              let count = try? JSONDecoder().decode(Int.self, from: data) else { return }
-        cachedLargeVideoCount = count
-        categoryCounts[.largeVideos] = count
+        let cached = persistence.cachedLargeVideoCount
+        guard cached >= 0 else { return }
+        categoryCounts[.largeVideos] = cached
     }
 
-    /// Saves the accurate large video count to disk for next launch.
+    /// Saves the accurate large video count to PersistenceService.
     private func saveLargeVideoCountToCache(_ count: Int) {
-        cachedLargeVideoCount = count
-        if let data = try? JSONEncoder().encode(count) {
-            try? data.write(to: cacheFileURL, options: .atomic)
-        }
+        persistence.cachedLargeVideoCount = count
+        persistence.largeVideoSyncDate = Date()
     }
 
     func refreshCategoryCounts() {
         Task.detached(priority: .userInitiated) {
             let service = PhotoLibraryService.shared
+            let persistence = await self.persistence
 
             // Ensure fetchResult is populated
             if service.fetchResult == nil {
@@ -133,43 +147,127 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
 
             let processed = await self.processedAssetIDs
 
-            // ── Phase 1: Instant estimates (milliseconds) ─────────────────
-            // Builds fast counts for all categories except largeVideos.
-            // largeVideos uses cached value from previous run if available.
+            // ── Phase 1: Instant fast counts for all categories ───────────
             var fastCounts: [FilterCategory: Int] = Dictionary(
                 uniqueKeysWithValues: FilterCategory.allCases.map {
                     ($0, service.countFast(for: $0, excluding: processed))
                 }
             )
 
-            // If we have a cached large video count, use it immediately.
-            // This means the user NEVER sees shimmer on repeat launches.
-            let cached = await self.cachedLargeVideoCount
-            if let cached {
-                fastCounts[.largeVideos] = cached
+            // Use cached large video count immediately if available.
+            // This means 0ms wait on every launch after the first scan.
+            let cachedCount = persistence.cachedLargeVideoCount
+            let hasCachedCount = cachedCount >= 0
+
+            if hasCachedCount {
+                fastCounts[.largeVideos] = cachedCount
             }
 
             await MainActor.run {
                 withAnimation { self.categoryCounts = fastCounts }
-                // Only show shimmer if we have NO cached value yet
-                self.isCountingLargeVideos = cached == nil
+                // Show shimmer only if no cache exists (first ever launch)
+                self.isCountingLargeVideos = !hasCachedCount
             }
 
-            // ── Phase 2: Accurate large video count in background ─────────
-            // Always runs to verify/update the cache, but only shows
-            // shimmer when there is no cached value (first ever launch).
-            let accurateLargeVideoCount = await Task.detached(priority: .background) {
+            // ── Phase 2: Incremental scan ─────────────────────────────────
+            // If library hasn't changed since last sync — skip entirely.
+            // PHPhotoLibraryChangeObserver already invalidated the cache
+            // if anything changed, so checking cachedCount >= 0 is enough.
+            guard !hasCachedCount else {
+                // Cache is valid — run a quick incremental check in background
+                // to account for any new or deleted large videos since last sync.
+                await self.runIncrementalScan(
+                    service: service,
+                    processed: processed,
+                    lastSyncDate: persistence.largeVideoSyncDate,
+                    cachedCount: cachedCount
+                )
+                return
+            }
+
+            // No cache — run full scan
+            let fullCount = await Task.detached(priority: .background) {
                 service.count(for: .largeVideos, excluding: processed)
             }.value
 
-            // Save to cache so next launch is instant
-            await self.saveLargeVideoCountToCache(accurateLargeVideoCount)
+            await self.saveLargeVideoCountToCache(fullCount)
 
             await MainActor.run {
                 withAnimation(.spring(response: 0.4)) {
-                    self.categoryCounts[.largeVideos] = accurateLargeVideoCount
+                    self.categoryCounts[.largeVideos] = fullCount
                     self.isCountingLargeVideos = false
                 }
+            }
+        }
+    }
+
+    /// Incremental scan: only checks assets created or modified since lastSyncDate.
+    /// Also accounts for deletions by comparing total video count to cached value.
+    /// Runs at background priority so it never affects UI responsiveness.
+    private func runIncrementalScan(
+        service: PhotoLibraryService,
+        processed: Set<String>,
+        lastSyncDate: Date?,
+        cachedCount: Int
+    ) async {
+        let updatedCount = await Task.detached(priority: .background) {
+
+            // ── Count deletions ───────────────────────────────────────────
+            // If total video count dropped since last sync, some large videos
+            // may have been deleted. We must recount from scratch in that case.
+            let allVideosOptions = PHFetchOptions()
+            allVideosOptions.predicate = NSPredicate(
+                format: "mediaType == %d", PHAssetMediaType.video.rawValue
+            )
+            let currentTotalVideos = PHAsset.fetchAssets(with: allVideosOptions).count
+
+            // Fetch total from last sync stored in persistence
+            let lastTotalVideos = UserDefaults.standard.integer(forKey: "lastTotalVideoCount")
+
+            if currentTotalVideos < lastTotalVideos {
+                // Videos were deleted — full recount needed
+                UserDefaults.standard.set(currentTotalVideos, forKey: "lastTotalVideoCount")
+                return service.count(for: .largeVideos, excluding: processed)
+            }
+
+            // ── Count new additions since last sync ───────────────────────
+            guard let syncDate = lastSyncDate else {
+                return service.count(for: .largeVideos, excluding: processed)
+            }
+
+            let newVideoOptions = PHFetchOptions()
+            newVideoOptions.predicate = NSPredicate(
+                format: "mediaType == %d AND creationDate > %@",
+                PHAssetMediaType.video.rawValue,
+                syncDate as NSDate
+            )
+            let newVideos = PHAsset.fetchAssets(with: newVideoOptions)
+
+            // Count how many of the new videos are large (>50MB)
+            var newLargeCount = 0
+            newVideos.enumerateObjects { asset, _, stop in
+                guard !processed.contains(asset.localIdentifier) else { return }
+                let resources = PHAssetResource.assetResources(for: asset)
+                let size = resources.first.flatMap {
+                    $0.value(forKey: "fileSize") as? Int64
+                } ?? 0
+                if size > 50_000_000 { newLargeCount += 1 }
+                if cachedCount + newLargeCount >= 100 { stop.pointee = true }
+            }
+
+            UserDefaults.standard.set(currentTotalVideos, forKey: "lastTotalVideoCount")
+            return min(cachedCount + newLargeCount, 100)
+        }.value
+
+        // Only update UI if count actually changed — avoids unnecessary redraws
+        guard updatedCount != cachedCount else { return }
+
+        await saveLargeVideoCountToCache(updatedCount)
+
+        await MainActor.run {
+            // Counter animation — number rolls from old value to new value
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
+                self.categoryCounts[.largeVideos] = updatedCount
             }
         }
     }
@@ -178,10 +276,10 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
 
     nonisolated func photoLibraryDidChange(_ changeInstance: PHChange) {
         Task { @MainActor in
-            // Library changed — invalidate large video cache so Phase 2
-            // runs fresh and the user sees accurate counts.
-            self.cachedLargeVideoCount = nil
-            try? FileManager.default.removeItem(at: self.cacheFileURL)
+            // Library changed — invalidate large video cache so
+            // incremental scan runs on next filter screen visit.
+            self.persistence.cachedLargeVideoCount = -1
+            self.persistence.largeVideoSyncDate = nil
 
             guard let oldResult = self.photoService.fetchResult else {
                 // No prior fetch — do a full initial load.
@@ -287,7 +385,7 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
                 return
             }
 
-            var items = rawItems
+            let items = rawItems
 
             print("📸 initial page: \(items.count) items, cursor: \(self.fetchCursor)/\(self.photoService.totalAssetCount)")
 
@@ -373,30 +471,44 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     // MARK: - Swipe Actions
 
     /// Swipe Right — Keep
-    func keepPhoto() {
-        guard let topCard = photoStack.first else { return }
-        processedAssetIDs.insert(topCard.id)
-        persistence.saveKeptID(topCard.id)
-        self.lastAction = (topCard, .keep)
-        photoStack.removeFirst()
-        hapticService.keep()
-        precacheNextImages()
-        loadNextPageIfNeeded()
-    }
+        func keepPhoto() {
+            guard let topCard = photoStack.first else { return }
+            processedAssetIDs.insert(topCard.id)
+            persistence.saveKeptID(topCard.id)
+            self.lastAction = (topCard, .keep)
+            photoStack.removeFirst()
+            hapticService.keep()
+            precacheNextImages()
+            
+            // Save to processed assets for notifications
+            saveProcessedAsset(assetId: topCard.id, action: .saved)
+            
+            loadNextPageIfNeeded()
+            
+            // Schedule notifications after keep action
+            NotificationScheduler.shared.evaluateAndScheduleNotifications()
+        }
 
     /// Swipe Left — Delete (moves to Review Bin)
-    func deletePhoto() {
-        guard let topCard = photoStack.first else { return }
-        processedAssetIDs.insert(topCard.id)
-        self.lastAction = (topCard, .delete)
-        photoStack.removeFirst()
-        reviewBin.append(topCard)
-        totalSpaceSaved += topCard.fileSize
-        hapticService.delete()
-        precacheNextImages()
-        saveBinToDisk()
-        loadNextPageIfNeeded()
-    }
+        func deletePhoto() {
+            guard let topCard = photoStack.first else { return }
+            processedAssetIDs.insert(topCard.id)
+            self.lastAction = (topCard, .delete)
+            photoStack.removeFirst()
+            reviewBin.append(topCard)
+            totalSpaceSaved += topCard.fileSize
+            hapticService.delete()
+            precacheNextImages()
+            saveBinToDisk()
+            
+            // Save to processed assets for notifications
+            saveProcessedAsset(assetId: topCard.id, action: .deleted)
+            
+            loadNextPageIfNeeded()
+            
+            // Schedule notifications after delete action
+            NotificationScheduler.shared.evaluateAndScheduleNotifications()
+        }
 
     /// Swipe Up — Star Keeper
     func starPhoto() {
@@ -438,36 +550,42 @@ class PhotoStackViewModel: NSObject, ObservableObject, @preconcurrency PHPhotoLi
     // MARK: - Review Bin Actions
 
     /// Restore a single item from the bin back to the swipe stack
-    func restoreFromBin(_ item: PhotoItem) {
-        guard let index = reviewBin.firstIndex(of: item) else { return }
-        reviewBin.remove(at: index)
-        processedAssetIDs.remove(item.id)
-        persistence.removeKeptID(item.id)
-        totalSpaceSaved -= item.fileSize
-        hapticService.selection()
-        saveBinToDisk()
-    }
+        func restoreFromBin(_ item: PhotoItem) {
+            guard let index = reviewBin.firstIndex(of: item) else { return }
+            reviewBin.remove(at: index)
+            processedAssetIDs.remove(item.id)
+            persistence.removeKeptID(item.id)
+            totalSpaceSaved -= item.fileSize
+            hapticService.selection()
+            saveBinToDisk()
+            
+            // Re-evaluate notifications after restoration
+            NotificationScheduler.shared.evaluateAndScheduleNotifications()
+        }
 
     /// Permanently delete everything in the Review Bin
-    func emptyTrash() async throws {
-        let assetsToDelete = reviewBin.map { $0.asset }
-        let currentSaved = totalSpaceSaved
+        func emptyTrash() async throws {
+            let assetsToDelete = reviewBin.map { $0.asset }
+            let currentSaved = totalSpaceSaved
 
-        // Drain the video pool BEFORE deleting assets — AVPlayerItems hold
-        // strong references to PHAssets and will crash if accessed after deletion.
-        VideoPlayerPool.shared.drainAll()
-        hapticService.emptyTrash()
-        try await photoService.deleteAssets(assetsToDelete)
+            // Drain the video pool BEFORE deleting assets — AVPlayerItems hold
+            // strong references to PHAssets and will crash if accessed after deletion.
+            VideoPlayerPool.shared.drainAll()
+            hapticService.emptyTrash()
+            try await photoService.deleteAssets(assetsToDelete)
 
-        // Permanently-deleted IDs stay in processedAssetIDs — they can never
-        // come back from the library anyway.
-        await MainActor.run {
-            persistence.totalSpaceSavedLifetime += currentSaved
-            reviewBin.removeAll()
-            totalSpaceSaved = 0
-            saveBinToDisk()
+            // Permanently-deleted IDs stay in processedAssetIDs — they can never
+            // come back from the library anyway.
+            await MainActor.run {
+                persistence.totalSpaceSavedLifetime += currentSaved
+                reviewBin.removeAll()
+                totalSpaceSaved = 0
+                saveBinToDisk()
+                
+                // Check for milestones after emptying trash
+                NotificationScheduler.shared.evaluateAndScheduleNotifications()
+            }
         }
-    }
 
     /// Resets all "Kept" decisions to start over
     func resetProgress() {
