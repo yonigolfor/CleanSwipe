@@ -4,6 +4,7 @@ struct VictoryView: View {
     let onEmptyBin: () -> Void
     var onImportPhotos: (() -> Void)? = nil
     var reviewBinCount: Int = 0
+    var currentFilter: FilterCategory = .all
     
     var body: some View {
         VStack(spacing: 25) {
@@ -26,7 +27,9 @@ struct VictoryView: View {
             .padding(.top, 40)
             
             VStack(spacing: 12) {
-                Text(String(localized: "victory.title"))
+                Text(currentFilter == .all ?
+                     String(localized: "victory.title") :
+                     "\(currentFilter.displayName) ✓")
                     .font(.largeTitle)
                     .fontWeight(.bold)
                     .minimumScaleFactor(0.8)

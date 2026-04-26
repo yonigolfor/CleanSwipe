@@ -17,7 +17,9 @@ struct SmartFiltersView: View {
             List {
                 Section {
                     ForEach(FilterCategory.allCases) { category in
-                        filterRow(for: category)
+                        if (category != .blurryPhotos){
+                            filterRow(for: category)
+                        }
                     }
                 } header: {
                                     Text(String(localized: "filters.section_header"))
@@ -27,7 +29,10 @@ struct SmartFiltersView: View {
             }
             .navigationTitle(String(localized: "filters.title"))
             .navigationBarTitleDisplayMode(.large)
-            .onAppear {
+            .task {
+                // .task is lifecycle-aware: it cancels automatically if the
+                // user leaves the screen before counting finishes.
+                // Only runs if counts have never been loaded.
                 if stackViewModel.categoryCounts.isEmpty {
                     stackViewModel.refreshCategoryCounts()
                 }
@@ -77,25 +82,15 @@ struct SmartFiltersView: View {
                 // Count badge
                 // For largeVideos: show shimmer during Phase 2 scan,
                 // then animate to the accurate count when ready.
-                if category == .largeVideos && stackViewModel.isCountingLargeVideos {
-                    // Large videos: shimmer while Phase 2 accurate scan runs
+                let isLoadingCount = stackViewModel.categoryCounts[category] == nil ||
+                    (category == .largeVideos && stackViewModel.isCountingLargeVideos)
+
+                if isLoadingCount {
                     ShimmerView()
-                } else if category == .blurryPhotos || category == .burstPhotos {
-                    // These categories require deep analysis — never show a
-                    // potentially misleading count. Show a scan indicator instead.
-                    HStack(spacing: 4) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.caption2)
-                        Text(String(localized: "filters.requires_scan"))
-                            .font(.caption)
-                    }
-                    .foregroundColor(category.color.opacity(0.8))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Capsule().fill(category.color.opacity(0.15)))
                 } else if let count = stackViewModel.categoryCounts[category] {
                     if count > 0 {
-                        Text("\(count)")
+                        // All Photos shows exact count. Other categories cap at 99+.
+                        Text(count >= 100 && category != .all ? "99+" : "\(count)")
                             .font(.subheadline)
                             .fontWeight(.semibold)
                             .foregroundColor(.white)
@@ -108,9 +103,6 @@ struct SmartFiltersView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
-                } else {
-                    ProgressView()
-                        .scaleEffect(0.7)
                 }
 
                 // Chevron — hidden when empty

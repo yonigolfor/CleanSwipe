@@ -226,9 +226,10 @@ class PhotoLibraryService: ObservableObject {
             return max(0, fetchResult.count - processedIDs.count)
         }
 
-        // For filtered categories, walk the result (PHFetchResult is already in-memory).
+        // Stop counting at 100 — UI displays 99+ for anything above 99.
+        let cap = 100
         var count = 0
-        fetchResult.enumerateObjects { asset, _, _ in
+        fetchResult.enumerateObjects { asset, _, stop in
             guard !processedIDs.contains(asset.localIdentifier) else { return }
             switch category {
             case .all: count += 1
@@ -237,18 +238,17 @@ class PhotoLibraryService: ObservableObject {
             case .screenRecordings:
                 if asset.isScreenRecording { count += 1 }
             case .largeVideos:
-                if asset.mediaType == .video {
-                    let resources = PHAssetResource.assetResources(for: asset)
-                    let size = resources.first.flatMap {
-                        $0.value(forKey: "fileSize") as? Int64
-                    } ?? 0
-                    if size > 50_000_000 { count += 1 }
-                }
+                let resources = PHAssetResource.assetResources(for: asset)
+                let size = resources.first.flatMap {
+                    $0.value(forKey: "fileSize") as? Int64
+                } ?? 0
+                if asset.mediaType == .video && size > 50_000_000 { count += 1 }
             case .burstPhotos:
                 count += 1
             case .blurryPhotos:
                 if asset.mediaType == .image && !asset.isScreenshot { count += 1 }
             }
+            if count >= cap { stop.pointee = true }
         }
         return count
     }

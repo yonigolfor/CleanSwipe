@@ -10,6 +10,9 @@
     "10,000+" : {
 
     },
+    "99+" : {
+
+    },
     "Awesome! 💪" : {
       "localizations" : {
         "he" : {
@@ -510,6 +513,7 @@
       }
     },
     "filters.requires_scan" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {

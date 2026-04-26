@@ -60,9 +60,11 @@ struct SwipeStackView: View {
                                     guard let url = URL(string: UIApplication.openSettingsURLString),
                                           UIApplication.shared.canOpenURL(url) else { return }
                                     UIApplication.shared.open(url)
-                                } : nil, reviewBinCount: viewModel.reviewBin.count
-    )
-    .id("victory")
+                                } : nil,
+                                reviewBinCount: viewModel.reviewBin.count,
+                                currentFilter: viewModel.currentFilter
+                            )
+                            .id("victory")
                         } else {
                             ForEach(
                                 Array(viewModel.photoStack.prefix(cardStackSize).enumerated()),
