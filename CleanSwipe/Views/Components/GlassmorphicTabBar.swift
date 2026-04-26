@@ -12,10 +12,10 @@ struct GlassmorphicTabBar: View {
     private let haptic = UIImpactFeedbackGenerator(style: .soft)
 
     private let tabs: [(icon: String, label: String)] = [
-            ("rectangle.stack", String(localized: "tab.swipe")),
-            ("line.3.horizontal.decrease.circle", String(localized: "tab.filters")),
-            ("trash", String(localized: "tab.review"))
-        ]
+        ("trash", String(localized: "tab.review")),
+        ("rectangle.stack", String(localized: "tab.swipe")),
+        ("line.3.horizontal.decrease.circle", String(localized: "tab.filters"))
+    ]
 
     var body: some View {
         HStack(spacing: 0) {
@@ -78,7 +78,7 @@ struct GlassmorphicTabBar: View {
                             .scaleEffect(isSelected ? 1.15 : 1.0)
                             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
 
-                        if index == 2 && reviewBinCount > 0 {
+                        if index == 0 && reviewBinCount > 0 {
                             Text("\(min(reviewBinCount, 99))")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundColor(.white)

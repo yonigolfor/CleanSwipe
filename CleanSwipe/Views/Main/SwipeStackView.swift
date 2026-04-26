@@ -55,7 +55,7 @@ struct SwipeStackView: View {
                             }
                         } else if viewModel.photoStack.isEmpty {
                             VictoryView(
-                                onEmptyBin: { selectedTab = 2 },
+                                onEmptyBin: { selectedTab = 0 },
                                 onImportPhotos: PHPhotoLibrary.authorizationStatus(for: .readWrite) == .limited ? {
                                     guard let url = URL(string: UIApplication.openSettingsURLString),
                                           UIApplication.shared.canOpenURL(url) else { return }
